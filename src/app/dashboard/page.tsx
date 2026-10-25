@@ -3,7 +3,10 @@ import {
   CalendarClock,
   ClipboardList,
   Cpu,
+  Download,
+  Mail,
   MapPin,
+  Phone,
   QrCode,
   ScanLine,
   ShieldCheck,
@@ -13,6 +16,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildIcsEvent } from "@/lib/ics";
 import { GenerateLabelsButton, LogoutButton } from "./actions";
 import ProposeDateForm from "./propose-date-form";
 
@@ -121,6 +125,37 @@ export default async function DashboardPage() {
   }
   timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
   const timelineItems = timeline.slice(0, 25);
+
+  // Agenda de visitas confirmadas → calendario descargable (.ics) para el
+  // teléfono del administrador: una sola agenda con todas las visitas.
+  const confirmedVisits = visitsAll.filter(
+    (v) => v.proposedDate && (v.status === "CONFIRMED" || v.status === "COMPLETED")
+  );
+  const agendaIcsHref = (() => {
+    if (!confirmedVisits.length) return null;
+    const events = confirmedVisits.map((v) =>
+      buildIcsEvent({
+        uid: `agenda-${v.id}`,
+        summary: `Visita técnica — ${v.customerName}${v.equipment ? ` (${v.equipment.name})` : ""}`,
+        description: [
+          `Cliente: ${v.customerName} <${v.customerEmail}>`,
+          v.contactName ? `Contacto en sitio: ${v.contactName} (${v.contactEmail ?? "sin correo"})` : "",
+          v.equipment ? `Equipo: ${v.equipment.name} · etiqueta ${v.equipment.label?.code ?? "-"}` : "",
+          `Motivo: ${v.issueDescription}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        location: v.address,
+        start: v.proposedDate as Date,
+      })
+    );
+    const merged =
+      ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Soporte IT//Agenda Admin//ES", "CALSCALE:GREGORIAN"]
+        .concat(events.map((e) => e.split("\r\n").slice(1, -1)).flat())
+        .concat(["END:VCALENDAR"])
+        .join("\r\n");
+    return `data:text/calendar;charset=utf-8,${encodeURIComponent(merged)}`;
+  })();
 
   const initials = session.name
     .split(" ")
@@ -265,7 +300,7 @@ export default async function DashboardPage() {
           {timelineItems.length ? (
             <ol className="timeline" style={{ marginTop: 18 }}>
               {timelineItems.map((item, i) => (
-                <li className="timeline-item" key={`${item.kind}-${item.date.toISOString()}-${i}`}>
+                <li className={`timeline-item${i === timelineItems.length - 1 ? " last" : ""}`} key={`${item.kind}-${item.date.toISOString()}-${i}`}>
                   <span className={`timeline-dot ${item.kind === "VISITA CONFIRMADA" ? "green" : item.kind === "VISITA RECHAZADA" ? "red" : ""}`} />
                   <div className="timeline-body">
                     <div className="timeline-kind">{item.kind}</div>
@@ -282,6 +317,51 @@ export default async function DashboardPage() {
             </ol>
           ) : (
             <div className="empty">Aún no hay intervenciones ni solicitudes registradas.</div>
+          )}
+        </section>
+
+        {/* Agenda del administrador con descarga .ics para el teléfono */}
+        <section className="card" id="agenda" style={{ marginTop: 18 }}>
+          <div className="section-head">
+            <div>
+              <h2 className="section-title">Agenda de visitas confirmadas</h2>
+              <div className="muted">Descarga el archivo .ics e impórtalo en el calendario de tu teléfono (Google Calendar, Apple…)</div>
+            </div>
+            {agendaIcsHref ? (
+              <a className="generate-button" href={agendaIcsHref} download={`agenda-visitas-${new Date().toISOString().slice(0, 10)}.ics`}>
+                <Download size={15} /> Descargar agenda (.ics)
+              </a>
+            ) : (
+              <span className="pill">Sin visitas agendadas</span>
+            )}
+          </div>
+          {confirmedVisits.length ? (
+            <ul className="agenda-list" style={{ marginTop: 14 }}>
+              {confirmedVisits
+                .slice()
+                .sort((a, b) => (a.proposedDate!.getTime() - b.proposedDate!.getTime()))
+                .map((v) => (
+                  <li className="agenda-item" key={v.id}>
+                    <div className="agenda-date">
+                      <strong>{v.proposedDate!.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}</strong>
+                      <span>{v.proposedDate!.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    <div className="agenda-info">
+                      <div className="item-title">{v.customerName}{v.equipment ? <> — <strong>{v.equipment.name}</strong></> : null}</div>
+                      <div className="item-sub"><MapPin size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.address}</div>
+                      <div className="item-sub">
+                        <Mail size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.contactName ?? v.customerName} · {v.contactEmail ?? v.customerEmail}
+                        {v.customerPhone ? <> <Phone size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.customerPhone}</> : null}
+                      </div>
+                    </div>
+                    <a className="agenda-ics" href={`/api/visitas/${v.id}/calendar`} download>
+                      <Download size={13} /> .ics
+                    </a>
+                  </li>
+                ))}
+            </ul>
+          ) : (
+            <div className="empty">Cuando un cliente acepte una fecha propuesta, la visita aparecerá aquí lista para descargar al calendario.</div>
           )}
         </section>
 
