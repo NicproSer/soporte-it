@@ -10,30 +10,35 @@ import { prisma } from "./prisma";
 export type GeneratedLabel = { uid: string; code: string; url: string };
 
 /* ------------------------------------------------------------------ */
-/*  Fix ENOENT '.next/server/vendor-chunks/data/Helvetica.afm'         */
+/*  Fix definitivo para las fuentes estándar de pdfkit                 */
 /*                                                                     */
-/*  pdfkit carga las métricas de sus fuentes estándar con              */
-/*  `fs.readFileSync(__dirname + "/data/<Fuente>.afm")`. Cuando        */
-/*  Next.js empaqueta pdfkit dentro de vendor-chunks, `__dirname`      */
-/*  apunta a `.next/server/vendor-chunks`, donde esos .afm no existen.  */
-/*  Solución (doble capa):                                             */
-/*   1) Copiar los .afm reales desde node_modules hasta la carpeta     */
-/*      `/data` que el bundle resuelve en tiempo de ejecución          */
-/*      (`__dirname` del módulo ya empaquetado + rutas típicas).        */
-/*   2) Parchar el constructor de las fuentes estándar para que lean   */
-/*      su contenido directamente de node_modules (en memoria), sin     */
-/*      depender de la ruta rota del bundle.                           */
+/*  pdfkit carga sus métricas .afm con                                 */
+/*  `fs.readFileSync(__dirname + "/data/<Fuente>.afm", "utf8")`.       */
+/*  Bajo Next.js esto fallaba de dos formas:                           */
+/*   • ENOENT: cuando Turbopack empaquetaba pdfkit dentro de           */
+/*     `.next/server/vendor-chunks` y la carpeta `data/` no existía.   */
+/*   • "Unknown font format": los intentos anteriores de registrar     */
+/*     los .afm vía `doc.registerFont(nombre, buffer)` hacían que      */
+/*     pdfkit enviara el contenido a fontkit, que solo entiende        */
+/*     TTF/OTF/WOFF — nunca AFM.                                       */
+/*                                                                     */
+/*  Solución (probada contra pdfkit 0.16):                             */
+/*   1) Parchar `fs.readFileSync` una sola vez: si pdfkit pide un      */
+/*      archivo `*.afm` por una ruta inexistente (bundle roto), se     */
+/*      redirige la lectura a node_modules/pdfkit/js/data/. Así las    */
+/*      fuentes estándar se construyen por el camino NATIVO de         */
+/*      pdfkit (StandardFont → AFMFont), sin tocar fontkit.            */
+/*   2) Red de seguridad adicional: copiar la carpeta `data/` junto a  */
+/*      las rutas típicas de chunks de Next por si algún loader        */
+/*      alternativo busca los .afm en disco directamente.              */
+/*  Importante: NO usar doc.registerFont() con contenido .afm; pdfkit  */
+/*  lo trataría como fuente embebida y fontkit lanzaría                */
+/*  "Unknown font format".                                             */
 /* ------------------------------------------------------------------ */
-const STANDARD_FONT_NAMES = [
-  "Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
-  "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique",
-  "Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic",
-  "Symbol", "ZapfDingbats",
-] as const;
 
 function afmDataDir(): string | null {
   const dir = path.join(process.cwd(), "node_modules", "pdfkit", "js", "data");
-  return fs.existsSync(dir) ? dir : null;
+  return fs.existsSync(path.join(dir, "Helvetica.afm")) ? dir : null;
 }
 
 let afmFixApplied = false;
@@ -44,83 +49,56 @@ function applyPdfKitAfmFix() {
   const dataDir = afmDataDir();
   if (!dataDir) return; // entorno sin node_modules visible: nada que hacer
 
-  // 1) Copiar los archivos .afm a las rutas candidatas donde el bundle los busca.
-  const files = fs.readdirSync(dataDir).filter((f) => f.endsWith(".afm"));
-  const targets = new Set<string>();
-  for (const base of [
-    __dirname, // ruta real del módulo una vez empaquetado por Next
-    path.resolve(process.cwd(), ".next/server/vendor-chunks"),
-    path.resolve(process.cwd(), ".next/server/app"),
-    path.resolve(process.cwd(), ".next/standalone/node_modules/pdfkit/js"),
-  ]) {
-    targets.add(path.join(base, "data"));
-  }
-  for (const target of targets) {
-    try {
-      fs.mkdirSync(target, { recursive: true });
-      for (const file of files) {
-        const dst = path.join(target, file);
-        if (!fs.existsSync(dst)) fs.copyFileSync(path.join(dataDir, file), dst);
+  // 1) Interceptor de lecturas .afm con ruta rota (vendor-chunks, etc.).
+  const realReadFileSync = fs.readFileSync;
+  (fs as unknown as { readFileSync: typeof fs.readFileSync }).readFileSync =
+    function patchedReadFileSync(
+      file: string | Buffer | URL | number,
+      options?: ({ encoding?: string | null; flag?: string } & WritableStreamBufferWriter) | string | null,
+    ) {
+      if (typeof file === "string" && file.endsWith(".afm")) {
+        try {
+          return realReadFileSync.call(fs, file as never, options as never);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            const name = file.split(/[\\/]/).pop()!;
+            const fallback = path.join(dataDir, name);
+            if (fs.existsSync(fallback)) {
+              return realReadFileSync.call(fs, fallback as never, options as never);
+            }
+          }
+          throw error;
+        }
       }
-    } catch {
-      /* permisos u otra causa: seguimos con la capa 2 */
-    }
-  }
+      return realReadFileSync.call(fs, file as never, options as never);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
 
-  // 2) Parchar FontsMixin.font(): si pdfkit va a crear una fuente estándar
-  //    (la que internamente lee `__dirname/data/*.afm`), interceptamos la
-  //    creación y le inyectamos el contenido del .afm leído de node_modules.
+  // 2) Red de seguridad: copiar los .afm junto a las rutas donde un bundle
+  //    de Next podría buscarlos (`__dirname/data`).
   try {
-    const proto = PDFDocument.prototype as unknown as {
-      _font?: { constructor: Function };
-      font(src: string | Buffer, family?: string, size?: number): unknown;
-    };
-    // La clase StandardFont no está exportada; la obtenemos del objeto de
-    // fuente por defecto que pdfkit instancia al construir el documento.
-    const probe = new PDFDocument({ autoFirstPage: false }) as unknown as {
-      _font: { constructor: Function };
-    };
-    const StandardFontClass = probe._font?.constructor;
-    if (StandardFontClass && StandardFontClass.name === "StandardFont") {
-      const Original = StandardFontClass as unknown as {
-        new (document: unknown, name: string, id: string): Record<string, unknown>;
-      };
-      function Patched(this: Record<string, unknown>, document: unknown, name: string, id: string) {
-        const instance = new Original(document, name, id);
-        // El constructor original pudo haber fallado antes… si no lanzó,
-        // reemplazamos las métricas con el contenido local para garantizar
-        // que futuras instancias tampoco dependan de la ruta rota.
-        return instance;
+    const files = fs.readdirSync(dataDir).filter((f) => f.endsWith(".afm"));
+    const targets = new Set<string>();
+    for (const base of [
+      path.resolve(process.cwd(), ".next/server/vendor-chunks"),
+      path.resolve(process.cwd(), ".next/server/app"),
+      path.resolve(process.cwd(), ".next/standalone/node_modules/pdfkit/js"),
+    ]) {
+      targets.add(path.join(base, "data"));
+    }
+    for (const target of targets) {
+      try {
+        fs.mkdirSync(target, { recursive: true });
+        for (const file of files) {
+          const dst = path.join(target, file);
+          if (!fs.existsSync(dst)) fs.copyFileSync(path.join(dataDir, file), dst);
+        }
+      } catch {
+        /* permisos u otra causa: el interceptor (capa 1) sigue funcionando */
       }
-      // En lugar de parchear la clase (difícil sin export), registramos cada
-      // fuente estándar como contenido en memoria usando la API pública:
-      void Patched; void StandardFontClass;
-      const mixinFont = proto.font;
-      void mixinFont;
-      // Registro público y soportado: doc.registerFont(nombre, bufferAfm, nombre)
-      // hace que doc.font("Helvetica") resuelva desde memoria. Se aplica por
-      // documento en createStickerPdf() mediante registerStandardFonts().
     }
   } catch {
-    /* el probe falló: seguimos solo con la copia de archivos */
-  }
-}
-
-/**
- * Registra las fuentes estándar leyendo su .afm directamente desde
- * node_modules (Buffer en memoria). Así `doc.font("Helvetica")` resuelve
- * sin pasar por el loader interno de pdfkit que provocaba el ENOENT.
- */
-function registerStandardFonts(doc: InstanceType<typeof PDFDocument>) {
-  const dataDir = afmDataDir();
-  if (!dataDir) return;
-  for (const name of STANDARD_FONT_NAMES) {
-    try {
-      const raw = fs.readFileSync(path.join(dataDir, `${name}.afm`));
-      doc.registerFont(name, raw, name);
-    } catch {
-      /* si un .afm no está disponible, pdfkit usará su propio loader */
-    }
+    /* readdir falló: el interceptor basta */
   }
 }
 
@@ -186,7 +164,6 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     autoFirstPage: false,
     info: { Title: `Etiquetas Soporte IT ${batchId}`, Author: "Soporte IT" },
   });
-  registerStandardFonts(doc);
   const output = fs.createWriteStream(filePath);
   doc.pipe(output);
 
