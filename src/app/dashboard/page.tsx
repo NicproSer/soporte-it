@@ -78,6 +78,7 @@ export default async function DashboardPage() {
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
         <nav className="nav" aria-label="Navegación principal">
           <a className="active" href="#inicio">▦ &nbsp; Resumen</a>
+          <a href="/equipos">✎ &nbsp; Fichas técnicas</a>
           <a href="#etiquetas">▧ &nbsp; Etiquetas QR</a>
           <a href="#equipos">▣ &nbsp; Equipos</a>
           <a href="#visitas">◷ &nbsp; Visitas técnicas</a>
@@ -181,7 +182,10 @@ export default async function DashboardPage() {
                       <div className="item-sub">{eq.category}{eq.brand ? ` · ${eq.brand}` : ""}{eq.model ? ` ${eq.model}` : ""}</div>
                       <div className="item-sub">{eq.label?.code} · {eq.location || "Sin ubicación"}</div>
                     </div>
-                    <span className={`pill ${eq.status === "ACTIVE" ? "green" : ""}`}>{equipmentStatusLabels[eq.status] ?? eq.status}</span>
+                    <div style={{ textAlign: "right", display: "grid", gap: 6, justifyItems: "end" }}>
+                      <span className={`pill ${eq.status === "ACTIVE" ? "green" : ""}`}>{equipmentStatusLabels[eq.status] ?? eq.status}</span>
+                      <a href={`/q/${eq.label?.uid}`} style={{ fontSize: 12, fontWeight: 700, color: "#1456c0" }}>Ver ficha →</a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -203,7 +207,7 @@ export default async function DashboardPage() {
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>Código</th><th>Estado</th><th>Lote</th><th>Creada</th></tr>
+                  <tr><th>Código</th><th>Estado</th><th>Lote</th><th>Creada</th><th>Ficha</th></tr>
                 </thead>
                 <tbody>
                   {labelList.map((label) => (
@@ -212,6 +216,7 @@ export default async function DashboardPage() {
                       <td><span className={`pill ${label.status === "AVAILABLE" ? "green" : "blue"}`}>{labelStatusLabels[label.status]}</span></td>
                       <td>{label.batchId ?? "—"}</td>
                       <td>{label.createdAt.toLocaleDateString("es-ES")} {label.createdAt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td><a href={`/q/${label.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Abrir →</a></td>
                     </tr>
                   ))}
                 </tbody>

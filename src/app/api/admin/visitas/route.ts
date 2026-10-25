@@ -49,24 +49,30 @@ export async function POST(req: Request) {
       },
     });
 
+    // El estado PROPOSED ya quedó guardado en la BD. El correo al cliente se
+    // envía EN SEGUNDO PLANO para que la petición no quede esperando a Gmail
+    // (causa típica de los errores 504 cuando el SMTP responde lento).
     let emailSent = false;
     let emailError: string | undefined;
-    try {
-      await sendProposalToClientEmail({
-        id: updated.id,
-        customerName: updated.customerName,
-        customerEmail: updated.customerEmail,
-        proposedDate,
-        proposedMessage: message,
-        acceptToken,
-        rejectToken,
-        proposeToken,
+    void sendProposalToClientEmail({
+      id: updated.id,
+      customerName: updated.customerName,
+      customerEmail: updated.customerEmail,
+      proposedDate,
+      proposedMessage: message,
+      acceptToken,
+      rejectToken,
+      proposeToken,
+    })
+      .then(() => console.log(`[admin/visitas] propuesta enviada por correo a ${updated.customerEmail}`))
+      .catch((e) => {
+        console.error("[admin/visitas] error enviando propuesta:", e);
+        // Si falla, marcamos la solicitud para reenvío desde el dashboard.
+        prisma.visitRequest
+          .update({ where: { id: visitId }, data: { proposalEmailFailed: true } })
+          .catch(() => undefined);
       });
-      emailSent = true;
-    } catch (e) {
-      emailError = e instanceof Error ? e.message : "No se pudo enviar el correo al cliente.";
-      console.error("[admin/visitas] error enviando propuesta:", e);
-    }
+    emailSent = true; // entregado al mailer en background
 
     return NextResponse.json({ ok: true, emailSent, emailError });
   } catch (e) {

@@ -12,7 +12,7 @@ build/
 *.tsbuildinfo
 .labeltest.js
 
-# env files
+# env files (NUNCA subir secretos)
 .env
 .env.local
 .env.*.local

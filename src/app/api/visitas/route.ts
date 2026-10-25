@@ -33,18 +33,21 @@ export async function POST(req: Request) {
     });
 
     // Notificación a los administradores (2 correos definidos en MAIL_TO_ADMIN).
+    // Se envía EN SEGUNDO PLANO (fire-and-forget): la solicitud ya quedó
+    // guardada en la BD y respondemos de inmediato. Así el navegador nunca
+    // queda esperando a Gmail y se evitan los errores 504 del proxy cuando
+    // el servidor SMTP responde lento o está bloqueado.
     let emailSent = false;
     let emailError: string | undefined;
-    try {
-      if (getAdminRecipients().length > 0) {
-        await sendNewVisitRequestEmail({ ...visit, customerPhone: visit.customerPhone });
-        emailSent = true;
-      } else {
-        emailError = "MAIL_TO_ADMIN no está configurado.";
-      }
-    } catch (e) {
-      emailError = e instanceof Error ? e.message : "Error desconocido al enviar el correo.";
-      console.error("[visitas] no se pudo notificar a administradores:", e);
+    const recipients = getAdminRecipients();
+    if (recipients.length === 0) {
+      emailError = "MAIL_TO_ADMIN no está configurado.";
+    } else {
+      // La petición HTTP termina aquí; este promise sigue en background.
+      void sendNewVisitRequestEmail({ ...visit, customerPhone: visit.customerPhone })
+        .then(() => console.log(`[visitas] correo de notificación enviado a ${recipients.length} administrador(es)`))
+        .catch((e) => console.error("[visitas] no se pudo notificar a administradores:", e));
+      emailSent = true; // entregado al mailer en background
     }
 
     return NextResponse.json({ ok: true, id: visit.id, emailSent, emailError });

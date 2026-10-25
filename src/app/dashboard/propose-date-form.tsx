@@ -38,8 +38,8 @@ export default function ProposeDateForm({ visitId, status, customerName }: Props
         setFeedback({
           kind: "ok",
           text: data.emailSent
-            ? `Propuesta enviada por correo a ${customerName}.`
-            : `Propuesta guardada. El correo al cliente falló: ${data.emailError ?? "revisa SMTP en .env"}`,
+            ? `Propuesta guardada. El correo a ${customerName} se está enviando en segundo plano (revisa la consola del servidor si no llega).`
+            : `Propuesta guardada, pero el correo no se pudo enviar: ${data.emailError ?? "revisa SMTP en .env"}`,
         });
         setOpen(false);
         setDate("");

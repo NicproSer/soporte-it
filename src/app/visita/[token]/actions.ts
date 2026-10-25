@@ -41,17 +41,16 @@ export async function handleAction(formData: FormData) {
     },
   });
 
-  try {
-    await sendClientResponseToAdminsEmail({
-      id: visit.id,
-      customerName: visit.customerName,
-      customerEmail: visit.customerEmail,
-      action: nextStatus === "CONFIRMED" ? "ACCEPTED" : nextStatus,
-      proposedDate: visit.proposedDate,
-      suggestedDate,
-      note: note || null,
-    });
-  } catch (e) {
-    console.error("[visita] no se pudo notificar a administradores:", e);
-  }
+  // La respuesta del cliente ya quedó guardada en la BD. El aviso a los
+  // administradores se envía en segundo plano para que el navegador no
+  // quede esperando a Gmail (evita errores 504 al aceptar/rechazar).
+  void sendClientResponseToAdminsEmail({
+    id: visit.id,
+    customerName: visit.customerName,
+    customerEmail: visit.customerEmail,
+    action: nextStatus === "CONFIRMED" ? "ACCEPTED" : nextStatus,
+    proposedDate: visit.proposedDate,
+    suggestedDate,
+    note: note || null,
+  }).catch((e) => console.error("[visita] no se pudo notificar a administradores:", e));
 }

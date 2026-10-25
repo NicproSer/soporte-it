@@ -28,7 +28,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      router.replace("/dashboard");
+      router.replace(data.redirect ?? "/dashboard");
       router.refresh();
     } catch {
       setError("Error de conexión. Inténtalo de nuevo.");
@@ -42,11 +42,11 @@ export default function LoginPage() {
         <div className="login-head">
           <div className="brand" style={{ color: "var(--navy)" }}>
             SOPORTE IT
-            <small style={{ color: "var(--muted)" }}>ACCESO ADMINISTRADOR</small>
+            <small style={{ color: "var(--muted)" }}>ACCESO AL SISTEMA</small>
           </div>
         </div>
         <h1 className="h1" style={{ fontSize: 24 }}>Iniciar sesión</h1>
-        <p className="muted">Ingresa con tu cuenta de administrador para consultar el panel de control.</p>
+        <p className="muted">Ingresa con tu cuenta: los administradores acceden al panel de control y los técnicos a la gestión de fichas técnicas.</p>
 
         {error ? <div className="login-error" role="alert">{error}</div> : null}
 
@@ -83,7 +83,7 @@ export default function LoginPage() {
 
         <div className="login-foot">
           <Link href="/">← Volver al inicio</Link>
-          <span>Sesión protegida · solo administradores</span>
+          <span>Sesión protegida · administradores y técnicos</span>
         </div>
       </form>
     </main>

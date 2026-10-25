@@ -22,10 +22,10 @@ export async function POST(request: Request) {
   if (!valid || !user) {
     return NextResponse.json({ error: "Correo o contraseña incorrectos." }, { status: 401 });
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Esta área es exclusiva para administradores." }, { status: 403 });
-  }
 
+  // Los administradores van al panel; los técnicos también entran pero son
+  // dirigidos a la búsqueda de etiquetas para llenar fichas técnicas.
+  const redirect = user.role === "ADMIN" ? "/dashboard" : "/equipos";
   await setSessionCookie({ sub: user.id, email: user.email, name: user.name, role: user.role });
-  return NextResponse.json({ ok: true, redirect: "/dashboard" });
+  return NextResponse.json({ ok: true, role: user.role, redirect });
 }

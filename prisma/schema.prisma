@@ -108,6 +108,8 @@ model VisitRequest {
   proposeToken        String?     @unique
   customerSuggestedDate DateTime?
   customerNote        String?
+  // true si el correo de propuesta al cliente falló (se puede reintentar desde el dashboard)
+  proposalEmailFailed Boolean       @default(false)
   equipmentId         String?     @db.ObjectId
   equipment           Equipment?  @relation(fields: [equipmentId], references: [id])
   createdAt           DateTime    @default(now())
