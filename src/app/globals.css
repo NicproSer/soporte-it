@@ -45,3 +45,22 @@
 .table td{padding:11px 10px;border-bottom:1px solid #edf1f5}
 .home-login-button{display:inline-flex;align-items:center;gap:8px;background:var(--blue);color:#fff;border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700;white-space:nowrap}
 .home-login-button:hover{background:#0f47a5}
+
+/* Home simple */
+.home-simple{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#f3f7fc 0%,#e5efff 100%)}
+.home-simple-card{width:min(460px,100%);background:#fff;border:1px solid var(--line);border-radius:22px;padding:44px 38px;text-align:center;box-shadow:0 18px 50px #0b254014}
+.home-simple-actions{display:grid;gap:12px}
+.home-secondary-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#eef4fb;color:#092746;border:1px solid #cfdcee;border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700}
+.home-secondary-button:hover{background:#e2ecf7}
+
+/* Formulario de visita */
+.visit-form .form-field input,.visit-form .form-field textarea,.propose-form input,.propose-form textarea{width:100%;margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;background:#fff;color:#0f2a43}
+.visit-form .form-field input:focus,.propose-form input:focus{outline:2px solid #1456c033;border-color:#1456c0}
+.propose-box{display:grid;gap:8px;justify-items:end}
+.propose-button{display:inline-flex;align-items:center;gap:6px;background:#eef4fb;border:1px solid #cfdcee;color:#174b9e;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.propose-button:hover{background:#e2ecf7}
+.propose-button.send{background:var(--blue);color:#fff;border-color:var(--blue)}
+.propose-button.cancel{background:#fff}
+.propose-form{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;width:280px;text-align:left}
+.pill.red{background:#fde3e0;color:#b3261e}
+.generate-status.done{background:#e7f8d5;color:#356d11;border:1px solid #bfe5a5;border-radius:10px;padding:9px 12px;font-size:12.5px}

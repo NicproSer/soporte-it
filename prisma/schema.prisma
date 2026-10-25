@@ -90,20 +90,26 @@ model Intervention {
 }
 
 model VisitRequest {
-  id                String      @id @default(auto()) @map("_id") @db.ObjectId
-  customerName      String
-  customerEmail     String
-  customerPhone     String?
-  address           String
-  issueDescription  String
-  preferredDate     DateTime?
-  proposedDate      DateTime?
-  proposedMessage   String?
-  status            VisitStatus @default(PENDING)
-  responseTokenHash String?
-  tokenExpiresAt    DateTime?
-  equipmentId       String?     @db.ObjectId
-  equipment         Equipment?  @relation(fields: [equipmentId], references: [id])
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id                  String      @id @default(auto()) @map("_id") @db.ObjectId
+  customerName        String
+  customerEmail       String
+  customerPhone       String?
+  address             String
+  issueDescription    String
+  preferredDate       DateTime?
+  proposedDate        DateTime?
+  proposedMessage     String?
+  status              VisitStatus @default(PENDING)
+  responseTokenHash   String?
+  tokenExpiresAt      DateTime?
+  // Tokens para el flujo de respuesta del cliente (aceptar / rechazar / proponer otra fecha)
+  acceptToken         String?     @unique
+  rejectToken         String?     @unique
+  proposeToken        String?     @unique
+  customerSuggestedDate DateTime?
+  customerNote        String?
+  equipmentId         String?     @db.ObjectId
+  equipment           Equipment?  @relation(fields: [equipmentId], references: [id])
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 }

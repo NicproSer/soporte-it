@@ -14,6 +14,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GenerateLabelsButton, LogoutButton } from "./actions";
+import ProposeDateForm from "./propose-date-form";
 
 export const dynamic = "force-dynamic";
 
@@ -138,21 +139,28 @@ export default async function DashboardPage() {
             {recentVisits.length ? (
               <div className="list">
                 {recentVisits.map((visit) => (
-                  <div className="list-item" key={visit.id}>
-                    <div>
+                  <div className="list-item" key={visit.id} style={{ flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 220 }}>
                       <div className="item-title">{visit.customerName} · {visit.issueDescription.slice(0, 80)}</div>
                       <div className="item-sub"><UserRound size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {visit.customerEmail}{visit.customerPhone ? ` · ${visit.customerPhone}` : ""}</div>
                       <div className="item-sub"><MapPin size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {visit.address}</div>
                       {visit.preferredDate ? <div className="item-sub"><CalendarClock size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> Prefiere: {visit.preferredDate.toLocaleDateString("es-ES")}</div> : null}
+                      {visit.proposedDate ? <div className="item-sub"><CalendarClock size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> Propuesta enviada: {visit.proposedDate.toLocaleDateString("es-ES")} {visit.proposedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div> : null}
+                      {visit.customerSuggestedDate ? <div className="item-sub" style={{ color: "#b3261e" }}><CalendarClock size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> Cliente sugiere: {visit.customerSuggestedDate.toLocaleDateString("es-ES")} {visit.customerSuggestedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}{visit.customerNote ? ` — “${visit.customerNote}”` : ""}</div> : null}
                     </div>
-                    <span className={`pill ${visit.status === "COMPLETED" ? "green" : visit.status === "CONFIRMED" ? "blue" : ""}`}>
-                      {visitStatusLabels[visit.status] ?? visit.status}
-                    </span>
+                    <div style={{ textAlign: "right" }}>
+                      <span className={`pill ${visit.status === "COMPLETED" || visit.status === "CONFIRMED" ? "green" : visit.status === "REJECTED" ? "red" : visit.status === "PROPOSED" ? "blue" : ""}`}>
+                        {visitStatusLabels[visit.status] ?? visit.status}
+                      </span>
+                      <div style={{ marginTop: 8 }}>
+                        <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="empty">Aún no hay solicitudes de visita técnica.</div>
+              <div className="empty">Aún no hay solicitudes de visita técnica. Cuando un cliente use la página pública <a href="/solicitar" style={{ color: "#1456c0", fontWeight: 700 }}>/solicitar</a>, aparecerá aquí y recibirás aviso por correo.</div>
             )}
           </section>
 
