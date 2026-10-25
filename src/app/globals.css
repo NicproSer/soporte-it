@@ -64,3 +64,24 @@
 .propose-form{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;width:280px;text-align:left}
 .pill.red{background:#fde3e0;color:#b3261e}
 .generate-status.done{background:#e7f8d5;color:#356d11;border:1px solid #bfe5a5;border-radius:10px;padding:9px 12px;font-size:12.5px}
+
+/* Línea de tiempo vertical (historial) */
+.timeline{list-style:none;margin:0;padding:0;position:relative}
+.timeline-item{position:relative;padding:0 0 18px 34px}
+.timeline-item::before{content:"";position:absolute;left:10px;top:6px;bottom:-2px;width:2px;background:#d7e3f2}
+.timeline-item.last::before{display:none}
+.timeline-dot{position:absolute;left:4px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--blue);border:3px solid #eaf1fb;box-shadow:0 0 0 1px #cfdcee}
+.timeline-dot.green{background:#2f9e44}
+.timeline-dot.red{background:#d13438}
+.timeline-body{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px}
+.timeline-kind{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#1456c0;margin-bottom:3px}
+
+/* Agenda con recordatorios .ics */
+.agenda-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.agenda-item{display:flex;align-items:center;gap:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px}
+.agenda-date{display:grid;place-items:center;min-width:58px;background:#fff;border:1px solid #cfdcee;border-radius:10px;padding:6px 8px;text-align:center}
+.agenda-date strong{font-size:15px;color:var(--blue);text-transform:capitalize}
+.agenda-date span{font-size:11px;color:var(--muted)}
+.agenda-info{flex:1;min-width:0}
+.agenda-ics{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:700;text-decoration:none;white-space:nowrap}
+.agenda-ics:hover{background:#0f47a5}

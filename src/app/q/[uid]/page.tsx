@@ -10,7 +10,24 @@ export const dynamic = "force-dynamic";
 /** Historial combinado (intervenciones + solicitudes de visita) como línea de tiempo vertical. */
 type TimelineItem = { date: Date; kind: "INTERVENCIÓN" | "SOLICITUD DE VISITA" | "VISITA CONFIRMADA" | "VISITA RECHAZADA"; title: string; detail?: string };
 
-function buildTimeline(equipment: NonNullable<Awaited<ReturnType<typeof getEquipmentWithHistory>>>): TimelineItem[] {
+async function getEquipmentWithHistory(uid: string) {
+  const label = await prisma.label.findUnique({
+    where: { uid },
+    include: {
+      equipment: {
+        include: {
+          interventions: { orderBy: { performedAt: "desc" } },
+          visits: { orderBy: { createdAt: "desc" } },
+        },
+      },
+    },
+  });
+  return label;
+}
+
+type EquipmentWithHistory = NonNullable<Awaited<ReturnType<typeof getEquipmentWithHistory>>>["equipment"];
+
+function buildTimeline(equipment: NonNullable<EquipmentWithHistory>): TimelineItem[] {
   const items: TimelineItem[] = [];
   for (const i of equipment.interventions) {
     items.push({ date: i.performedAt, kind: "INTERVENCIÓN", title: i.type, detail: i.description });
@@ -30,21 +47,6 @@ function buildTimeline(equipment: NonNullable<Awaited<ReturnType<typeof getEquip
     }
   }
   return items.sort((a, b) => b.date.getTime() - a.date.getTime());
-}
-
-async function getEquipmentWithHistory(uid: string) {
-  const label = await prisma.label.findUnique({
-    where: { uid },
-    include: {
-      equipment: {
-        include: {
-          interventions: { orderBy: { performedAt: "desc" } },
-          visits: { orderBy: { createdAt: "desc" } },
-        },
-      },
-    },
-  });
-  return label;
 }
 
 function toDateInputValue(date: Date | null | undefined): string {
@@ -150,7 +152,7 @@ export default async function PublicEquipmentPage({ params }: { params: Promise<
                 {timeline.length ? (
                   <ol className="timeline" style={{ marginTop: 18 }}>
                     {timeline.map((item, i) => (
-                      <li className="timeline-item" key={`${item.kind}-${item.date.toISOString()}-${i}`}>
+                      <li className={`timeline-item${i === timeline.length - 1 ? " last" : ""}`} key={`${item.kind}-${item.date.toISOString()}-${i}`}>
                         <span className={`timeline-dot ${item.kind === "VISITA CONFIRMADA" ? "green" : item.kind === "VISITA RECHAZADA" ? "red" : ""}`} />
                         <div className="timeline-body">
                           <div className="timeline-kind">{item.kind}</div>
@@ -176,5 +178,4 @@ export default async function PublicEquipmentPage({ params }: { params: Promise<
       </article>
     </main>
   );
-}
 }
