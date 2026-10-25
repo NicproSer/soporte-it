@@ -39,6 +39,19 @@ export default async function VisitStatusPage({ params }: { params: Promise<{ to
               {visit.customerSuggestedDate ? <> · Tu sugerencia: {visit.customerSuggestedDate.toLocaleDateString("es-ES")}</> : null}
             </div>
           ) : null}
+          {/* Recordatorio .ics descargable en el calendario del teléfono */}
+          {(visit.status === "CONFIRMED" || visit.status === "COMPLETED") && visit.proposedDate ? (
+            <div style={{ marginTop: 18 }}>
+              <a
+                href={`/api/visitas/${visit.id}/calendar`}
+                download
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1456c0", color: "#fff", fontWeight: 700, fontSize: 14, border: 0, borderRadius: 10, padding: "12px 22px", textDecoration: "none" }}
+              >
+                <CalendarClock size={17} /> Descargar recordatorio (.ics)
+              </a>
+              <div className="generate-hint" style={{ marginTop: 8 }}>Guárdalo en tu teléfono para recibir alertas 1 día y 1 hora antes de la visita.</div>
+            </div>
+          ) : null}
           <div style={{ marginTop: 26 }}><a className="home-login-button" href="/solicitar">Nueva solicitud</a></div>
         </div>
       </article>

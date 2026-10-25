@@ -46,7 +46,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
   if (session.role !== "ADMIN") redirect("/login");
 
-  const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList] =
+  const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList, interventionsAll, visitsAll] =
     await Promise.all([
       prisma.label.count({ where: { status: "AVAILABLE" } }),
       prisma.label.count(),
@@ -56,6 +56,8 @@ export default async function DashboardPage() {
       prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true } }),
       prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }),
       prisma.label.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.intervention.findMany({ orderBy: { performedAt: "desc" }, take: 50, include: { equipment: { include: { label: true } }, technician: true } }),
+      prisma.visitRequest.findMany({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED", "CONFIRMED", "COMPLETED", "REJECTED"] } }, orderBy: { createdAt: "desc" }, take: 60, include: { equipment: { include: { label: true } } } }),
     ]);
 
   const metrics = [
@@ -64,6 +66,61 @@ export default async function DashboardPage() {
     { label: "Visitas pendientes", value: String(pendingVisits), foot: "Solicitudes por revisar", icon: CalendarClock },
     { label: "Intervenciones", value: String(interventionCount), foot: "Mantenimientos registrados", icon: Wrench },
   ];
+
+
+  // Historial global como línea de tiempo vertical: combina intervenciones y
+  // solicitudes/confirmaciones/rechazos de visita en orden cronológico.
+  type TimelineItem = {
+    date: Date;
+    kind: "INTERVENCIÓN" | "SOLICITUD" | "VISITA CONFIRMADA" | "VISITA RECHAZADA";
+    title: string;
+    detail?: string;
+    equipment?: string;
+    labelCode?: string;
+  };
+  const timeline: TimelineItem[] = [];
+  for (const i of interventionsAll) {
+    timeline.push({
+      date: i.performedAt,
+      kind: "INTERVENCIÓN",
+      title: `${i.type} — ${i.equipment?.name ?? "Equipo eliminado"}`,
+      detail: `${i.description}${i.technician ? ` · Técnico: ${i.technician.name}` : ""}`,
+      equipment: i.equipment?.name,
+      labelCode: i.equipment?.label?.code,
+    });
+  }
+  for (const v of visitsAll) {
+    timeline.push({
+      date: v.createdAt,
+      kind: "SOLICITUD",
+      title: `Solicitud de ${v.contactName ?? v.customerName}`,
+      detail: `${v.issueDescription.slice(0, 140)}${v.proposedDate ? ` · Propuesta: ${v.proposedDate.toLocaleDateString("es-ES")}` : ""}`,
+      equipment: v.equipment?.name,
+      labelCode: v.equipment?.label?.code,
+    });
+    if ((v.status === "CONFIRMED" || v.status === "COMPLETED") && v.proposedDate) {
+      timeline.push({
+        date: v.proposedDate,
+        kind: "VISITA CONFIRMADA",
+        title: `Visita confirmada — ${v.customerName}`,
+        detail: v.address,
+        equipment: v.equipment?.name,
+        labelCode: v.equipment?.label?.code,
+      });
+    }
+    if (v.status === "REJECTED") {
+      timeline.push({
+        date: v.updatedAt,
+        kind: "VISITA RECHAZADA",
+        title: `Visita rechazada — ${v.customerName}`,
+        detail: v.customerNote ?? undefined,
+        equipment: v.equipment?.name,
+        labelCode: v.equipment?.label?.code,
+      });
+    }
+  }
+  timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const timelineItems = timeline.slice(0, 25);
 
   const initials = session.name
     .split(" ")
@@ -79,6 +136,7 @@ export default async function DashboardPage() {
         <nav className="nav" aria-label="Navegación principal">
           <a className="active" href="#inicio">▦ &nbsp; Resumen</a>
           <a href="/equipos">✎ &nbsp; Fichas técnicas</a>
+          <a href="/dashboard/clientes">◈ &nbsp; Clientes y dispositivos</a>
           <a href="#etiquetas">▧ &nbsp; Etiquetas QR</a>
           <a href="#equipos">▣ &nbsp; Equipos</a>
           <a href="#visitas">◷ &nbsp; Visitas técnicas</a>
@@ -195,35 +253,35 @@ export default async function DashboardPage() {
           </section>
         </div>
 
+        {/* Historial global como línea de tiempo vertical */}
         <section className="card" id="historial" style={{ marginTop: 18 }}>
           <div className="section-head">
             <div>
-              <h2 className="section-title">Etiquetas generadas recientemente</h2>
-              <div className="muted">Identificadores permanentes creados en la base de datos</div>
+              <h2 className="section-title">Historial — línea de tiempo</h2>
+              <div className="muted">Intervenciones y solicitudes de visita en orden cronológico (más recientes primero)</div>
             </div>
             <ClipboardList size={20} color="#1456c0" />
           </div>
-          {labelList.length ? (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr><th>Código</th><th>Estado</th><th>Lote</th><th>Creada</th><th>Ficha</th></tr>
-                </thead>
-                <tbody>
-                  {labelList.map((label) => (
-                    <tr key={label.id}>
-                      <td><strong>{label.code}</strong></td>
-                      <td><span className={`pill ${label.status === "AVAILABLE" ? "green" : "blue"}`}>{labelStatusLabels[label.status]}</span></td>
-                      <td>{label.batchId ?? "—"}</td>
-                      <td>{label.createdAt.toLocaleDateString("es-ES")} {label.createdAt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
-                      <td><a href={`/q/${label.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Abrir →</a></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {timelineItems.length ? (
+            <ol className="timeline" style={{ marginTop: 18 }}>
+              {timelineItems.map((item, i) => (
+                <li className="timeline-item" key={`${item.kind}-${item.date.toISOString()}-${i}`}>
+                  <span className={`timeline-dot ${item.kind === "VISITA CONFIRMADA" ? "green" : item.kind === "VISITA RECHAZADA" ? "red" : ""}`} />
+                  <div className="timeline-body">
+                    <div className="timeline-kind">{item.kind}</div>
+                    <div className="item-title">{item.title}</div>
+                    {item.detail ? <div className="item-sub">{item.detail}</div> : null}
+                    <div className="item-sub">
+                      <CalendarClock size={12} style={{ display: "inline", verticalAlign: "-2px" }} />{" "}
+                      {item.date.toLocaleDateString("es-ES")} · {item.date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      {item.labelCode ? <> · Etiqueta <strong>{item.labelCode}</strong></> : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
           ) : (
-            <div className="empty">No hay etiquetas todavía. Usa el botón “Generar etiquetas” para crear tu primer lote.</div>
+            <div className="empty">Aún no hay intervenciones ni solicitudes registradas.</div>
           )}
         </section>
 

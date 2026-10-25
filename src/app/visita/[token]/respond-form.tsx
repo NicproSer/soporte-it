@@ -34,7 +34,17 @@ export default function RespondVisitForm({ visitId, kind, customerName, proposed
             <CheckCircle2 size={54} color="#2e7d32" style={{ margin: "0 auto 16px", display: "block" }} />
             <h1 className="h1" style={{ fontSize: 24 }}>{m.title}</h1>
             <p className="muted" style={{ maxWidth: 430, margin: "10px auto 24px" }}>{m.text}</p>
-            <a className="home-login-button" href="/solicitar">Nueva solicitud</a>
+            {/* Recordatorio descargable en el calendario del teléfono (.ics) */}
+            {kind === "accept" && proposedDate ? (
+              <a
+                className="generate-button"
+                href={`/api/visitas/${visitId}/calendar`}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1456c0", color: "#fff", fontWeight: 700, fontSize: 14, border: 0, borderRadius: 10, padding: "12px 22px", textDecoration: "none", marginBottom: 18 }}
+              >
+                <CalendarClock size={17} /> Descargar recordatorio (.ics)
+              </a>
+            ) : null}
+            <div><a className="home-login-button" href="/solicitar">Nueva solicitud</a></div>
           </div>
         </article>
       </main>

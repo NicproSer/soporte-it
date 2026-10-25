@@ -17,6 +17,9 @@ type Props = {
     warrantyUntil: string;  // yyyy-mm-dd | ""
     status: string;
     notes: string;
+    ownerName: string;
+    ownerEmail: string;
+    ownerPhone: string;
   };
 };
 
@@ -61,6 +64,26 @@ export default function FichaForm({ uid, initial }: Props) {
   return (
     <form onSubmit={onSubmit} style={{ marginTop: 18 }}>
       <div className="field-grid">
+        {/* Cliente propietario: se usa para agrupar dispositivos en el panel y
+            prellenar la solicitud de visita cuando alguien escanea el QR. */}
+        <label style={{ gridColumn: "1 / -1", marginTop: 4 }}>
+          <span className="field-label" style={{ textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 800, color: "#174b9e" }}>👤 Datos del cliente (aparecen al escanear el QR)</span>
+        </label>
+        <label>
+          <span className="field-label">Nombre del cliente *</span>
+          <input name="ownerName" required defaultValue={initial?.ownerName ?? ""} placeholder="Razón social o nombre del cliente" style={inputStyle} />
+        </label>
+        <label>
+          <span className="field-label">Correo del cliente *</span>
+          <input name="ownerEmail" type="email" required defaultValue={initial?.ownerEmail ?? ""} placeholder="cliente@empresa.com" style={inputStyle} />
+        </label>
+        <label>
+          <span className="field-label">Teléfono del cliente</span>
+          <input name="ownerPhone" defaultValue={initial?.ownerPhone ?? ""} placeholder="+56 9 1234 5678" style={inputStyle} />
+        </label>
+        <label style={{ gridColumn: "1 / -1" }}>
+          <span className="field-label" style={{ textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 800, color: "#174b9e" }}>🖥️ Datos del equipo</span>
+        </label>
         <label style={{ gridColumn: "1 / -1" }}>
           <span className="field-label">Nombre del equipo *</span>
           <input name="name" required defaultValue={initial?.name ?? ""} placeholder="Ej. Servidor Dell R740" style={inputStyle} />
