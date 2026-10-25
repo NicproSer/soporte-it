@@ -42,8 +42,31 @@ export function GenerateLabelsButton() {
         return;
       }
       setStatus({ kind: "done", message: `Lote ${data.batchId} creado con ${data.created} etiquetas.` });
-      // Descarga automática del PDF generado.
-      window.open(data.downloadUrl, "_blank", "noopener");
+      // Descarga automática del PDF generado. Se obtiene vía fetch (con la
+      // cookie de sesión) y se dispara con un <a download>, porque window.open
+      // no siempre descarga cuando el servidor responde con Content-Disposition
+      // (y falla del todo si el navegador bloquea la ventana emergente).
+      try {
+        const pdfResponse = await fetch(data.downloadUrl);
+        if (!pdfResponse.ok) throw new Error(String(pdfResponse.status));
+        const blob = await pdfResponse.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `stickers-${data.batchId}-carta.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        setStatus({ kind: "done", message: `Lote ${data.batchId} creado con ${data.created} etiquetas. El PDF se descargó automáticamente.` });
+      } catch {
+        setStatus({
+          kind: "done",
+          message: `Lote ${data.batchId} creado, pero la descarga automática falló. `,
+        });
+        // Plan B: abrir la URL directa del PDF en una pestaña nueva.
+        window.open(data.downloadUrl, "_blank", "noopener");
+      }
       // Actualiza las métricas del dashboard desde la base de datos.
       router.refresh();
     } catch {
