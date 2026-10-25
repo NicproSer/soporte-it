@@ -1,8 +1,26 @@
-node_modules
-.next
-out
+# dependencies
+node_modules/
+
+# next.js build output
+.next/
+out/
+
+# production
+build/
+
+# misc
+*.tsbuildinfo
+.labeltest.js
+
+# env files
 .env
 .env.local
-*.pdf
-.DS_Store
-tsconfig.tsbuildinfo
+.env.*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local label/pdf output
+output/
