@@ -1,0 +1,38 @@
+{
+  "name": "soporte-it",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "labels:generate": "tsx scripts/generate-labels.ts",
+    "labels:pdf": "tsx scripts/render-labels.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.0",
+    "pdfkit": "^0.16.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-icons": "^5.7.0",
+    "svg-to-pdfkit": "^0.1.8",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pdfkit": "^0.13.9",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/svg-to-pdfkit": "^0.1.4",
+    "prisma": "^6.19.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TECHNICIAN
+}
+
+enum LabelStatus {
+  AVAILABLE
+  ASSIGNED
+  RETIRED
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+  REPLACED
+}
+
+enum VisitStatus {
+  PENDING
+  PROPOSED
+  REJECTED
+  CONFIRMED
+  RESCHEDULE_REQUESTED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  email         String          @unique
+  passwordHash  String
+  role          UserRole        @default(TECHNICIAN)
+  interventions Intervention[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Label {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  uid       String      @unique
+  code      String      @unique
+  status    LabelStatus @default(AVAILABLE)
+  equipment Equipment?
+  batchId   String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Equipment {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  labelId        String          @unique @db.ObjectId
+  label          Label           @relation(fields: [labelId], references: [id])
+  name           String
+  category       String
+  brand          String?
+  model          String?
+  serialNumber   String?
+  location       String?
+  installationAt DateTime?
+  warrantyUntil  DateTime?
+  status         EquipmentStatus @default(ACTIVE)
+  notes          String?
+  interventions  Intervention[]
+  visits         VisitRequest[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Intervention {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  equipmentId String    @db.ObjectId
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  technicianId String   @db.ObjectId
+  technician  User      @relation(fields: [technicianId], references: [id])
+  type        String
+  description String
+  performedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+}
+
+model VisitRequest {
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  customerName      String
+  customerEmail     String
+  customerPhone     String?
+  address           String
+  issueDescription  String
+  preferredDate     DateTime?
+  proposedDate      DateTime?
+  proposedMessage   String?
+  status            VisitStatus @default(PENDING)
+  responseTokenHash String?
+  tokenExpiresAt    DateTime?
+  equipmentId       String?     @db.ObjectId
+  equipment         Equipment?  @relation(fields: [equipmentId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
