@@ -5,3 +5,4 @@ out
 .env.local
 *.pdf
 .DS_Store
+tsconfig.tsbuildinfo

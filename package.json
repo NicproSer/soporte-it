@@ -10,10 +10,13 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "labels:generate": "tsx scripts/generate-labels.ts",
-    "labels:pdf": "tsx scripts/render-labels.ts"
+    "labels:pdf": "tsx scripts/render-labels.ts",
+    "seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.13",
     "lucide-react": "^0.468.0",
     "next": "^15.5.0",
     "pdfkit": "^0.16.0",
@@ -25,6 +28,7 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.0",
     "@types/pdfkit": "^0.13.9",
     "@types/qrcode": "^1.5.5",
