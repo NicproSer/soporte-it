@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * Devuelve un archivo .ics (iCalendar) con el recordatorio de la visita, para
  * que el cliente lo descargue y lo agregue al calendario de su teléfono.
  */
-export async function _GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const visit = await prisma.visitRequest.findUnique({ where: { id }, include: { equipment: true } });
   const when = visit?.proposedDate ?? visit?.customerSuggestedDate ?? null;
@@ -34,4 +34,3 @@ export async function _GET(req: Request, { params }: { params: Promise<{ id: str
     },
   });
 }
-export { _GET as GET };

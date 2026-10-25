@@ -71,6 +71,11 @@ model Equipment {
   warrantyUntil  DateTime?
   status         EquipmentStatus @default(ACTIVE)
   notes          String?
+  // Propietario/cliente del equipo (se registra al crear la ficha técnica;
+  // permite prellenar y agrupar solicitudes de visita por cliente)
+  ownerName      String?
+  ownerEmail     String?
+  ownerPhone     String?
   interventions  Intervention[]
   visits         VisitRequest[]
   createdAt      DateTime        @default(now())
@@ -93,6 +98,10 @@ model VisitRequest {
   id                  String      @id @default(auto()) @map("_id") @db.ObjectId
   customerName        String
   customerEmail       String
+  // Nombre/correo de la persona de contacto que solicita la visita (puede
+  // diferir del propietario registrado en el equipo)
+  contactName         String?
+  contactEmail        String?
   customerPhone       String?
   address             String
   issueDescription    String

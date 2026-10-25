@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import type { VisitStatus } from "@prisma/client";
 import { sendNewVisitRequestEmail, getAdminRecipients } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     const equipment = label.equipment;
 
     // Bloquear duplicados abiertos del mismo equipo por el mismo contacto.
-    const openStatuses = ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED", "CONFIRMED"];
+    const openStatuses: VisitStatus[] = ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED", "CONFIRMED"];
     const existingOpen = await prisma.visitRequest.findFirst({
       where: {
         equipmentId: equipment.id,
