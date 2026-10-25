@@ -13,16 +13,35 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bat
   if (!/^LOT-\d{8}-[A-F0-9]{6}$/i.test(batchId)) {
     return NextResponse.json({ error: "Lote inválido." }, { status: 400 });
   }
-  const filePath = path.resolve(process.cwd(), "output", `stickers-${batchId}.pdf`);
-  // Comprobación de trayectoria para evitar traversal.
-  if (!filePath.startsWith(path.resolve(process.cwd(), "output")) || !fs.existsSync(filePath)) {
-    return NextResponse.json({ error: "El PDF no está disponible." }, { status: 404 });
+  // El botón del dashboard ahora genera el PDF tipo carta (mismo diseño que
+  // render-labels.ts); se aceptan también los nombres antiguos por compatibilidad.
+  const outputDir = path.resolve(process.cwd(), "output");
+  const candidates = [
+    `stickers-${batchId}-carta.pdf`,
+    `stickers-${batchId}.pdf`,
+  ];
+  let filePath: string | null = null;
+  for (const name of candidates) {
+    const p = path.join(outputDir, name);
+    if (p.startsWith(outputDir) && fs.existsSync(p)) {
+      filePath = p;
+      break;
+    }
+  }
+  if (!filePath) {
+    return NextResponse.json(
+      { error: "El PDF no está disponible. Vuelve a generar el lote desde el dashboard." },
+      { status: 404 },
+    );
   }
   const buffer = await fs.promises.readFile(filePath);
-  return new NextResponse(buffer, {
+  const fileName = path.basename(filePath);
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="stickers-${batchId}.pdf"`,
+      "Content-Length": String(buffer.length),
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Cache-Control": "no-store",
     },
   });
 }
