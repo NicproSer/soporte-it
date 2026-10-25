@@ -32,18 +32,66 @@ function getTransporter() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    // --- Anti-timeout (evita errores 504) ---
+    // Si el servidor SMTP no responde a tiempo, cortamos la conexión en vez
+    // de dejar la petición HTTP colgada hasta que el proxy devuelva 504.
+    connectionTimeout: 8_000, // conectar en máx. 8 s
+    greetingTimeout: 8_000,   // saludo SMTP en máx. 8 s
+    socketTimeout: 15_000,    // inactividad del socket en máx. 15 s
+    pool: true,               // reutiliza conexiones TLS entre envíos
+    maxConnections: 2,
+    messageRetention: 30_000,
   } as TransportOptions);
 }
 
+/**
+ * Envía un correo con límite de tiempo duro. Si Gmail tarda más de
+ * MAIL_TIMEOUT_MS (o el puerto 465 está bloqueado y se intenta el fallback
+ * 587), aborta con error claro en lugar de colgar la petición (504).
+ */
+const MAIL_TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS ?? 20_000);
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}: tiempo de espera agotado (${ms / 1000} s).`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function sendMail(to: string[], subject: string, html: string, text?: string) {
-  const transporter = getTransporter();
-  await transporter.sendMail({
+  const message = {
     from: `"Soporte IT" <${process.env.SMTP_USER}>`,
     to: to.join(","),
     subject,
     html,
     text: text ?? stripHtml(html),
-  });
+  };
+
+  try {
+    await withTimeout(getTransporter().sendMail(message), MAIL_TIMEOUT_MS, "SMTP (puerto 465)");
+  } catch (e) {
+    // Puerto 465 bloqueado por la red → reintento único con STARTTLS 587.
+    console.error("[mail] fallo en 465, reintentando con 587:", e);
+    const host = process.env.SMTP_HOST ?? "smtp.gmail.com";
+    const fallback = nodemailer.createTransport({
+      host,
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      connectionTimeout: 8_000,
+      greetingTimeout: 8_000,
+      socketTimeout: 15_000,
+    } as TransportOptions);
+    await withTimeout(fallback.sendMail(message), MAIL_TIMEOUT_MS, "SMTP (puerto 587)");
+  }
 }
 
 function stripHtml(html: string): string {
