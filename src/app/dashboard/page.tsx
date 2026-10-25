@@ -14,6 +14,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GenerateLabelsButton, LogoutButton } from "./actions";
+import MobileNav, { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
 export const dynamic = "force-dynamic";
@@ -72,17 +73,27 @@ export default async function DashboardPage() {
     .join("")
     .toUpperCase();
 
+  const navItems: MobileNavItem[] = [
+    { href: "#inicio", icon: "▦", label: "Resumen" },
+    { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
+    { href: "#etiquetas", icon: "▧", label: "Etiquetas QR" },
+    { href: "#equipos", icon: "▣", label: "Equipos" },
+    { href: "#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "#historial", icon: "☷", label: "Intervenciones" },
+  ];
+
   return (
     <div className="shell">
+      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} />
+
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
         <nav className="nav" aria-label="Navegación principal">
-          <a className="active" href="#inicio">▦ &nbsp; Resumen</a>
-          <a href="/equipos">✎ &nbsp; Fichas técnicas</a>
-          <a href="#etiquetas">▧ &nbsp; Etiquetas QR</a>
-          <a href="#equipos">▣ &nbsp; Equipos</a>
-          <a href="#visitas">◷ &nbsp; Visitas técnicas</a>
-          <a href="#historial">☷ &nbsp; Intervenciones</a>
+          {navItems.map((item) => (
+            <a key={item.href} className={item.href === "#inicio" ? "active" : undefined} href={item.href}>
+              {item.icon} &nbsp;{item.label}
+            </a>
+          ))}
         </nav>
         <div className="side-note">
           Sesión de administrador:<br />

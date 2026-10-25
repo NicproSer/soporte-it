@@ -4,7 +4,6 @@ import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-// @ts-expect-error -- svg-to-pdfkit no trae definiciones de tipos.
 import SVGtoPDF from "svg-to-pdfkit";
 import { prisma } from "./prisma";
 
@@ -191,9 +190,11 @@ export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fi
   const buffer = await fs.promises.readFile(filePath).catch(() => null);
   if (buffer) return { buffer, fileName };
 
-  // Último recurso: renderizar directamente a memoria sin tocar disco.
-  const mem = await renderStickerPdfToBuffer(labels, batchId);
-  return { buffer: mem, fileName };
+  // Último recurso: renderStickerPdf ya construye el PDF EN MEMORIA; si la
+  // escritura a disco falló, lo recuperamos desde su caché interna.
+  const mem = lastPdfChunks();
+  if (!mem.length) throw new Error("No se pudo generar el PDF del lote.");
+  return { buffer: Buffer.concat(mem), fileName };
 }
 
 /**
@@ -205,6 +206,12 @@ export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fi
 const PT = 72;
 const PAGE_W = 8.5 * PT;
 const PAGE_H = 11 * PT;
+
+/** Caché del último PDF construido en memoria por renderStickerPdf(). */
+let lastPdfBuffer: Buffer[] = [];
+function lastPdfChunks(): Buffer[] {
+  return lastPdfBuffer;
+}
 
 const settingsSvg = `
 <svg xmlns="http://www.w3.org/2000/svg"
@@ -227,6 +234,7 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
   // El PDF se construye EN MEMORIA: así el endpoint puede responderlo aunque
   // el servidor no pueda escribir en disco (permisos, antivirus, Windows).
   const pdfChunks: Buffer[] = [];
+  lastPdfBuffer = pdfChunks; // expone la caché para getBatchPdf() si falla el disco
   doc.on("data", (chunk: Buffer) => pdfChunks.push(chunk));
   const fileWriteFailed = { value: false };
   try {
