@@ -68,23 +68,37 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
     return () => window.removeEventListener("keydown", onKey);
   }, [moreOpen]);
 
-  const isHome = pathname === "/dashboard";
-  const isActive = (href: string) => {
-    if (href.startsWith("#")) return isHome; // anclas viven en /dashboard
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
-
   // Secciones principales del bottom bar (5 + "Más").
   // Disponible en TODAS las páginas y pantallas cuando hay sesión de ADMIN/TECHNICIAN.
   const primary: BottomItem[] = [
-    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} /> },
+    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} />, match: (p) => p === "/dashboard" || (p.startsWith("/dashboard/") && !p.startsWith("/dashboard/clientes")) },
     { href: "/scan", label: "Escanear", icon: <ScanLine size={21} /> },
     { href: "/calendario", label: "Agenda", icon: <CalendarIcon />, match: (p) => p === "/calendario" || p.startsWith("/calendario/") },
-    { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/q/") },
-    { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} /> },
+    { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/equipos/") || p.startsWith("/q/") },
+    { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} />, match: (p) => p.startsWith("/dashboard/clientes") },
   ];
 
-  const secondary = items.filter((i) => !primary.some((p) => p.href === i.href));
+  const isActive = (href: string) => {
+    // Quitamos el ancla (#seccion) para comparar la ruta base.
+    const clean = href.split("#")[0];
+    if (clean === "/dashboard") {
+      return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+    }
+    return pathname === clean || pathname.startsWith(`${clean}/`);
+  };
+
+  // Deduplica: si un enlace adicional apunta a una sección que ya cubre un
+  // botón principal (ej. /dashboard#visitas → Panel), no se repite en "Más".
+  const coveredByPrimary = (href: string) => {
+    const clean = href.split("#")[0];
+    return primary.some((p) => {
+      const pc = p.href.split("#")[0];
+      if (pc === "/dashboard") return clean === "/dashboard";
+      return clean === pc || clean.startsWith(`${pc}/`);
+    });
+  };
+
+  const secondary = items.filter((i) => !coveredByPrimary(i.href));
 
   return (
     <>

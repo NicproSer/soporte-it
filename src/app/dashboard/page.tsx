@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { GenerateLabelsButton, LogoutButton } from "./actions";
+import { GenerateLabelsButton } from "./actions";
 import { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
@@ -73,37 +73,21 @@ export default async function DashboardPage() {
     .join("")
     .toUpperCase();
 
+  // Enlaces adicionales que aparecen en la hoja "Más" del menú global.
+  // El MISMO menú (barra inferior + hoja) se usa en móvil y en desktop:
+  // se renderiza desde el layout raíz (SessionNav) cuando hay sesión de
+  // ADMIN/TECHNICIAN, por lo que aquí ya no existe un sidebar aparte.
   const navItems: MobileNavItem[] = [
-    { href: "#inicio", icon: "▦", label: "Resumen" },
-    { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
-    { href: "#etiquetas", icon: "▧", label: "Etiquetas QR" },
-    { href: "#equipos", icon: "▣", label: "Equipos" },
-    { href: "#visitas", icon: "◷", label: "Visitas técnicas" },
-    { href: "#historial", icon: "☷", label: "Intervenciones" },
+    { href: "/dashboard", icon: "▦", label: "Resumen" },
+    { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
+    { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
+    { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "/dashboard#historial", icon: "☷", label: "Intervenciones" },
+    { href: "/dashboard/clientes", icon: "◉", label: "Clientes y dispositivos" },
   ];
 
   return (
-    <div className="shell">
-      {/* El MobileNav global (bottom nav + header) se renderiza desde el
-          layout raíz cuando hay sesión; aquí solo queda el sidebar de escritorio. */}
-
-      <aside className="sidebar">
-        <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
-        <nav className="nav" aria-label="Navegación principal">
-          {navItems.map((item) => (
-            <a key={item.href} className={item.href === "#inicio" ? "active" : undefined} href={item.href}>
-              {item.icon} &nbsp;{item.label}
-            </a>
-          ))}
-        </nav>
-        <div className="side-note">
-          Sesión de administrador:<br />
-          <strong style={{ color: "#fff" }}>{session.name}</strong><br />
-          {session.email}
-          <div style={{ marginTop: 12 }}><LogoutButton /></div>
-        </div>
-      </aside>
-
+    <div className="shell shell-single">
       <main className="main" id="inicio">
         <div className="topline">
           <div>

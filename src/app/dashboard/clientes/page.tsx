@@ -56,22 +56,9 @@ export default async function ClientsPage({
   const clients = [...groups.entries()].sort((a, b) => b[1].items.length - a[1].items.length || a[1].name.localeCompare(b[1].name));
 
   return (
-    <div className="shell">
-
-      <aside className="sidebar">
-        <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
-        <nav className="nav" aria-label="Navegación principal">
-          <a href="/dashboard">▦ &nbsp; Resumen</a>
-          <a className="active" href="/dashboard/clientes">◈ &nbsp; Clientes y dispositivos</a>
-          <a href="/equipos">✎ &nbsp; Fichas técnicas</a>
-          <a href="/dashboard#visitas">◷ &nbsp; Visitas técnicas</a>
-        </nav>
-        <div className="side-note">
-          Sesión de administrador:<br />
-          <strong style={{ color: "#fff" }}>{session.name}</strong><br />
-          {session.email}
-        </div>
-      </aside>
+    // Sin sidebar propio: el menú global (barra inferior + hoja "Más") se
+    // renderiza desde el layout raíz en móvil Y desktop cuando hay sesión.
+    <div className="shell shell-single">
 
       <main className="main">
         <div className="topline">
