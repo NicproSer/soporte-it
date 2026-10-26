@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { Building2, Cpu, Mail, Phone, Search } from "lucide-react";
+import { Building2, Cpu, Mail, PencilLine, Phone, Search } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import MobileNav from "../mobile-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,17 @@ export default async function ClientsPage({
 
   return (
     <div className="shell">
+      <MobileNav
+        items={[
+          { href: "/dashboard", icon: "▦", label: "Resumen" },
+          { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
+          { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+        ]}
+        sessionName={session.name}
+        sessionEmail={session.email}
+        sessionRole={session.role}
+      />
+
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
         <nav className="nav" aria-label="Navegación principal">
@@ -128,7 +140,14 @@ export default async function ClientsPage({
                           <td>{eq.location || "—"}</td>
                           <td><span className={`pill ${eq.status === "ACTIVE" ? "green" : ""}`}>{equipmentStatusLabels[eq.status] ?? eq.status}</span></td>
                           <td>{eq.visits.length}</td>
-                          <td><a href={`/q/${eq.label?.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Ver →</a></td>
+                          <td style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <a href={`/q/${eq.label?.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Ver →</a>
+                            {eq.label?.uid ? (
+                              <a href={`/q/${eq.label.uid}?edit=1`} style={{ color: "#48607a", fontWeight: 700, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }} title="Editar ficha y datos del cliente">
+                                <PencilLine size={13} /> Editar
+                              </a>
+                            ) : null}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

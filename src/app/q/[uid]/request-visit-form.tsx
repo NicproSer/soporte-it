@@ -94,6 +94,11 @@ export default function RequestVisitForm({ uid, equipmentId, labelCode, equipmen
 
   return (
     <form onSubmit={onSubmit} style={{ marginTop: 4 }}>
+      {ownerName ? (
+        <div style={{ background: "#eef4fb", border: "1px solid #cfe0f5", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#28456b" }}>
+          Equipo registrado a nombre de <strong>{ownerName}</strong>. Solo necesitamos tus datos de contacto para coordinar la visita.
+        </div>
+      ) : null}
       <div className="field-grid">
         <label>
           <span className="field-label">Tu nombre (persona de contacto) *</span>
