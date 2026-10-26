@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CalendarClock, LayoutDashboard, QrCode, Users } from "lucide-react";
+import { ScanLine, Users, Wallet } from "lucide-react";
 import { LogoutButton } from "./actions";
+
+/** Icono de QR simple en SVG (evita dependencias extra). */
+function QrScannerIcon() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <rect x="9" y="9" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
 
 export type MobileNavItem = { href: string; icon: string; label: string };
 
@@ -52,12 +62,13 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  // Secciones principales del bottom bar (máx. 4 + "Más")
+  // Secciones principales del bottom bar (máx. 4 + "Más").
+  // Disponible en TODAS las páginas cuando hay sesión de ADMIN/TECHNICIAN.
   const primary: BottomItem[] = [
-    { href: "#inicio", label: "Resumen", icon: <LayoutDashboard size={21} />, match: () => isHome && !pathname.includes("clientes") },
+    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} /> },
+    { href: "/scan", label: "Escanear", icon: <ScanLine size={21} /> },
+    { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/q/") },
     { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} /> },
-    { href: "/equipos", label: "Fichas", icon: <QrCode size={21} /> },
-    { href: "#visitas", label: "Visitas", icon: <CalendarClock size={21} />, match: () => isHome },
   ];
 
   const secondary = items.filter((i) => !primary.some((p) => p.href === i.href));
@@ -68,6 +79,9 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
         <div className="brand">
           SOPORTE IT<small>GESTIÓN TÉCNICA</small>
         </div>
+        <a href="/scan" className="menu-toggle" aria-label="Escanear etiqueta QR" style={{ display: "flex", alignItems: "center", gap: 6, color: "#fff", fontSize: 13, textDecoration: "none" }}>
+          <ScanLine size={20} /> Escanear
+        </a>
         <div className="avatar" title={sessionEmail}>
           {sessionName.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "AD"}
         </div>

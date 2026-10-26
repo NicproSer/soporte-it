@@ -14,7 +14,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GenerateLabelsButton, LogoutButton } from "./actions";
-import MobileNav, { type MobileNavItem } from "./mobile-nav";
+import { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +84,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="shell">
-      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} />
+      {/* El MobileNav global (bottom nav + header) se renderiza desde el
+          layout raíz cuando hay sesión; aquí solo queda el sidebar de escritorio. */}
 
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
