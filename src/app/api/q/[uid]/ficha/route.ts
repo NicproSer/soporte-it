@@ -56,17 +56,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
   const rawStatus = cleanStr(body.status, 20)?.toUpperCase();
   const status: EquipmentStatus = (STATUSES as string[]).includes(rawStatus ?? "") ? (rawStatus as EquipmentStatus) : "ACTIVE";
 
-  // Datos del cliente (propietario): obligatorios al registrar por primera vez.
-  const ownerName = cleanStr(body.ownerName, 160);
-  const rawOwnerEmail = cleanStr(body.ownerEmail, 160)?.toLowerCase();
-  const emailOk = !!rawOwnerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawOwnerEmail);
-  if (!ownerName || !emailOk) {
-    return NextResponse.json(
-      { error: "El nombre y un correo válido del cliente son obligatorios." },
-      { status: 400 },
-    );
-  }
-
   const data = {
     name,
     category,
@@ -78,9 +67,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     warrantyUntil: toDate(body.warrantyUntil),
     status,
     notes: cleanStr(body.notes, 2000) ?? null,
-    ownerName,
-    ownerEmail: rawOwnerEmail ?? null,
-    ownerPhone: cleanStr(body.ownerPhone, 40) ?? null,
   };
 
   // upsert sobre labelId (campo único en Equipment)

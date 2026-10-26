@@ -84,7 +84,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="shell">
-      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} sessionRole={session.role} />
+      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} />
 
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
@@ -94,7 +94,6 @@ export default async function DashboardPage() {
               {item.icon} &nbsp;{item.label}
             </a>
           ))}
-          <a href="/dashboard/clientes">◈ &nbsp;Clientes y dispositivos</a>
         </nav>
         <div className="side-note">
           Sesión de administrador:<br />

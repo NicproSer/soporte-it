@@ -17,9 +17,6 @@ type Props = {
     warrantyUntil: string;  // yyyy-mm-dd | ""
     status: string;
     notes: string;
-    ownerName: string;
-    ownerEmail: string;
-    ownerPhone: string;
   };
 };
 
