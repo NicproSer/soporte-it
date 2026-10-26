@@ -140,7 +140,14 @@ export default async function ClientsPage({
                           <td>{eq.location || "—"}</td>
                           <td><span className={`pill ${eq.status === "ACTIVE" ? "green" : ""}`}>{equipmentStatusLabels[eq.status] ?? eq.status}</span></td>
                           <td>{eq.visits.length}</td>
-                          <td><a href={`/q/${eq.label?.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Ver →</a></td>
+                          <td style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <a href={`/q/${eq.label?.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Ver →</a>
+                            {eq.label?.uid ? (
+                              <a href={`/q/${eq.label.uid}?edit=1`} style={{ color: "#48607a", fontWeight: 700, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }} title="Editar ficha y datos del cliente">
+                                <PencilLine size={13} /> Editar
+                              </a>
+                            ) : null}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

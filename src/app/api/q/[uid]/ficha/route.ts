@@ -67,6 +67,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     warrantyUntil: toDate(body.warrantyUntil),
     status,
     notes: cleanStr(body.notes, 2000) ?? null,
+    ownerName: cleanStr(body.ownerName, 160) ?? null,
+    ownerEmail: cleanStr(body.ownerEmail, 160)?.toLowerCase() ?? null,
+    ownerPhone: cleanStr(body.ownerPhone, 40) ?? null,
   };
 
   // upsert sobre labelId (campo único en Equipment)
