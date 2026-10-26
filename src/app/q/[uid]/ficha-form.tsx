@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Save } from "lucide-react";
+import { CheckCircle2, Loader2, Save, UserRound } from "lucide-react";
 
 type Props = {
   uid: string;
@@ -64,26 +64,6 @@ export default function FichaForm({ uid, initial }: Props) {
   return (
     <form onSubmit={onSubmit} style={{ marginTop: 18 }}>
       <div className="field-grid">
-        {/* Cliente propietario: se usa para agrupar dispositivos en el panel y
-            prellenar la solicitud de visita cuando alguien escanea el QR. */}
-        <label style={{ gridColumn: "1 / -1", marginTop: 4 }}>
-          <span className="field-label" style={{ textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 800, color: "#174b9e" }}>👤 Datos del cliente (aparecen al escanear el QR)</span>
-        </label>
-        <label>
-          <span className="field-label">Nombre del cliente *</span>
-          <input name="ownerName" required defaultValue={initial?.ownerName ?? ""} placeholder="Razón social o nombre del cliente" style={inputStyle} />
-        </label>
-        <label>
-          <span className="field-label">Correo del cliente *</span>
-          <input name="ownerEmail" type="email" required defaultValue={initial?.ownerEmail ?? ""} placeholder="cliente@empresa.com" style={inputStyle} />
-        </label>
-        <label>
-          <span className="field-label">Teléfono del cliente</span>
-          <input name="ownerPhone" defaultValue={initial?.ownerPhone ?? ""} placeholder="+56 9 1234 5678" style={inputStyle} />
-        </label>
-        <label style={{ gridColumn: "1 / -1" }}>
-          <span className="field-label" style={{ textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 800, color: "#174b9e" }}>🖥️ Datos del equipo</span>
-        </label>
         <label style={{ gridColumn: "1 / -1" }}>
           <span className="field-label">Nombre del equipo *</span>
           <input name="name" required defaultValue={initial?.name ?? ""} placeholder="Ej. Servidor Dell R740" style={inputStyle} />
@@ -128,6 +108,27 @@ export default function FichaForm({ uid, initial }: Props) {
         <label style={{ gridColumn: "1 / -1" }}>
           <span className="field-label">Observaciones</span>
           <textarea name="notes" rows={3} defaultValue={initial?.notes ?? ""} placeholder="Notas técnicas, configuraciones especiales, contratos de soporte…" style={inputStyle} />
+        </label>
+      </div>
+
+      <div style={{ marginTop: 22, marginBottom: 6, fontWeight: 800, fontSize: 14, color: "#0f2a43", display: "flex", alignItems: "center", gap: 8 }}>
+        <UserRound size={16} color="#1456c0" /> Datos del cliente (propietario del equipo)
+      </div>
+      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+        Nombre y correo son obligatorios al registrar por primera vez. Al escanear el QR, la solicitud de visita técnica se prellena con estos datos.
+      </div>
+      <div className="field-grid">
+        <label>
+          <span className="field-label">Nombre del cliente *</span>
+          <input name="ownerName" required defaultValue={initial?.ownerName ?? ""} placeholder="Persona o empresa propietaria" style={inputStyle} maxLength={160} />
+        </label>
+        <label>
+          <span className="field-label">Correo del cliente *</span>
+          <input name="ownerEmail" type="email" required defaultValue={initial?.ownerEmail ?? ""} placeholder="cliente@empresa.com" style={inputStyle} maxLength={160} />
+        </label>
+        <label style={{ gridColumn: "1 / -1" }}>
+          <span className="field-label">Teléfono del cliente</span>
+          <input name="ownerPhone" defaultValue={initial?.ownerPhone ?? ""} placeholder="+57 300 000 0000 (opcional)" style={inputStyle} maxLength={40} />
         </label>
       </div>
 

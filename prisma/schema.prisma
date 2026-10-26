@@ -71,9 +71,8 @@ model Equipment {
   warrantyUntil  DateTime?
   status         EquipmentStatus @default(ACTIVE)
   notes          String?
-  // Cliente propietario del equipo (se registra al crear la ficha técnica).
-  // Permite: (1) agrupar dispositivos de un mismo cliente en el panel,
-  // (2) prellenar la solicitud de visita cuando alguien escanea el QR.
+  // Propietario/cliente del equipo (se registra al crear la ficha técnica;
+  // permite prellenar y agrupar solicitudes de visita por cliente)
   ownerName      String?
   ownerEmail     String?
   ownerPhone     String?
@@ -81,8 +80,6 @@ model Equipment {
   visits         VisitRequest[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-
-  @@index([ownerEmail])
 }
 
 model Intervention {
@@ -101,6 +98,10 @@ model VisitRequest {
   id                  String      @id @default(auto()) @map("_id") @db.ObjectId
   customerName        String
   customerEmail       String
+  // Nombre/correo de la persona de contacto que solicita la visita (puede
+  // diferir del propietario registrado en el equipo)
+  contactName         String?
+  contactEmail        String?
   customerPhone       String?
   address             String
   issueDescription    String
@@ -118,10 +119,6 @@ model VisitRequest {
   customerNote        String?
   // true si el correo de propuesta al cliente falló (se puede reintentar desde el dashboard)
   proposalEmailFailed Boolean       @default(false)
-  // Datos de la persona que solicita la visita (puede ser distinta del
-  // propietario del equipo registrado en la ficha técnica).
-  contactName         String?
-  contactEmail        String?
   equipmentId         String?     @db.ObjectId
   equipment           Equipment?  @relation(fields: [equipmentId], references: [id])
   createdAt           DateTime    @default(now())

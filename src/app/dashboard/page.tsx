@@ -3,10 +3,7 @@ import {
   CalendarClock,
   ClipboardList,
   Cpu,
-  Download,
-  Mail,
   MapPin,
-  Phone,
   QrCode,
   ScanLine,
   ShieldCheck,
@@ -16,8 +13,8 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { buildIcsEvent } from "@/lib/ics";
 import { GenerateLabelsButton, LogoutButton } from "./actions";
+import MobileNav, { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +47,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
   if (session.role !== "ADMIN") redirect("/login");
 
-  const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList, interventionsAll, visitsAll] =
+  const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList] =
     await Promise.all([
       prisma.label.count({ where: { status: "AVAILABLE" } }),
       prisma.label.count(),
@@ -60,8 +57,6 @@ export default async function DashboardPage() {
       prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true } }),
       prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }),
       prisma.label.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.intervention.findMany({ orderBy: { performedAt: "desc" }, take: 50, include: { equipment: { include: { label: true } }, technician: true } }),
-      prisma.visitRequest.findMany({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED", "CONFIRMED", "COMPLETED", "REJECTED"] } }, orderBy: { createdAt: "desc" }, take: 60, include: { equipment: { include: { label: true } } } }),
     ]);
 
   const metrics = [
@@ -71,92 +66,6 @@ export default async function DashboardPage() {
     { label: "Intervenciones", value: String(interventionCount), foot: "Mantenimientos registrados", icon: Wrench },
   ];
 
-
-  // Historial global como línea de tiempo vertical: combina intervenciones y
-  // solicitudes/confirmaciones/rechazos de visita en orden cronológico.
-  type TimelineItem = {
-    date: Date;
-    kind: "INTERVENCIÓN" | "SOLICITUD" | "VISITA CONFIRMADA" | "VISITA RECHAZADA";
-    title: string;
-    detail?: string;
-    equipment?: string;
-    labelCode?: string;
-  };
-  const timeline: TimelineItem[] = [];
-  for (const i of interventionsAll) {
-    timeline.push({
-      date: i.performedAt,
-      kind: "INTERVENCIÓN",
-      title: `${i.type} — ${i.equipment?.name ?? "Equipo eliminado"}`,
-      detail: `${i.description}${i.technician ? ` · Técnico: ${i.technician.name}` : ""}`,
-      equipment: i.equipment?.name,
-      labelCode: i.equipment?.label?.code,
-    });
-  }
-  for (const v of visitsAll) {
-    timeline.push({
-      date: v.createdAt,
-      kind: "SOLICITUD",
-      title: `Solicitud de ${v.contactName ?? v.customerName}`,
-      detail: `${v.issueDescription.slice(0, 140)}${v.proposedDate ? ` · Propuesta: ${v.proposedDate.toLocaleDateString("es-ES")}` : ""}`,
-      equipment: v.equipment?.name,
-      labelCode: v.equipment?.label?.code,
-    });
-    if ((v.status === "CONFIRMED" || v.status === "COMPLETED") && v.proposedDate) {
-      timeline.push({
-        date: v.proposedDate,
-        kind: "VISITA CONFIRMADA",
-        title: `Visita confirmada — ${v.customerName}`,
-        detail: v.address,
-        equipment: v.equipment?.name,
-        labelCode: v.equipment?.label?.code,
-      });
-    }
-    if (v.status === "REJECTED") {
-      timeline.push({
-        date: v.updatedAt,
-        kind: "VISITA RECHAZADA",
-        title: `Visita rechazada — ${v.customerName}`,
-        detail: v.customerNote ?? undefined,
-        equipment: v.equipment?.name,
-        labelCode: v.equipment?.label?.code,
-      });
-    }
-  }
-  timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
-  const timelineItems = timeline.slice(0, 25);
-
-  // Agenda de visitas confirmadas → calendario descargable (.ics) para el
-  // teléfono del administrador: una sola agenda con todas las visitas.
-  const confirmedVisits = visitsAll.filter(
-    (v) => v.proposedDate && (v.status === "CONFIRMED" || v.status === "COMPLETED")
-  );
-  const agendaIcsHref = (() => {
-    if (!confirmedVisits.length) return null;
-    const events = confirmedVisits.map((v) =>
-      buildIcsEvent({
-        uid: `agenda-${v.id}`,
-        summary: `Visita técnica — ${v.customerName}${v.equipment ? ` (${v.equipment.name})` : ""}`,
-        description: [
-          `Cliente: ${v.customerName} <${v.customerEmail}>`,
-          v.contactName ? `Contacto en sitio: ${v.contactName} (${v.contactEmail ?? "sin correo"})` : "",
-          v.equipment ? `Equipo: ${v.equipment.name} · etiqueta ${v.equipment.label?.code ?? "-"}` : "",
-          `Motivo: ${v.issueDescription}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        location: v.address,
-        start: v.proposedDate as Date,
-      })
-    );
-    const merged =
-      ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Soporte IT//Agenda Admin//ES", "CALSCALE:GREGORIAN"]
-        .concat(events.map((e) => e.split("\r\n").slice(1, -1)).flat())
-        .concat(["END:VCALENDAR"])
-        .join("\r\n");
-    return `data:text/calendar;charset=utf-8,${encodeURIComponent(merged)}`;
-  })();
-
   const initials = session.name
     .split(" ")
     .map((part) => part[0])
@@ -164,18 +73,28 @@ export default async function DashboardPage() {
     .join("")
     .toUpperCase();
 
+  const navItems: MobileNavItem[] = [
+    { href: "#inicio", icon: "▦", label: "Resumen" },
+    { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
+    { href: "#etiquetas", icon: "▧", label: "Etiquetas QR" },
+    { href: "#equipos", icon: "▣", label: "Equipos" },
+    { href: "#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "#historial", icon: "☷", label: "Intervenciones" },
+  ];
+
   return (
     <div className="shell">
+      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} sessionRole={session.role} />
+
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
         <nav className="nav" aria-label="Navegación principal">
-          <a className="active" href="#inicio">▦ &nbsp; Resumen</a>
-          <a href="/equipos">✎ &nbsp; Fichas técnicas</a>
-          <a href="/dashboard/clientes">◈ &nbsp; Clientes y dispositivos</a>
-          <a href="#etiquetas">▧ &nbsp; Etiquetas QR</a>
-          <a href="#equipos">▣ &nbsp; Equipos</a>
-          <a href="#visitas">◷ &nbsp; Visitas técnicas</a>
-          <a href="#historial">☷ &nbsp; Intervenciones</a>
+          {navItems.map((item) => (
+            <a key={item.href} className={item.href === "#inicio" ? "active" : undefined} href={item.href}>
+              {item.icon} &nbsp;{item.label}
+            </a>
+          ))}
+          <a href="/dashboard/clientes">◈ &nbsp;Clientes y dispositivos</a>
         </nav>
         <div className="side-note">
           Sesión de administrador:<br />
@@ -288,80 +207,35 @@ export default async function DashboardPage() {
           </section>
         </div>
 
-        {/* Historial global como línea de tiempo vertical */}
         <section className="card" id="historial" style={{ marginTop: 18 }}>
           <div className="section-head">
             <div>
-              <h2 className="section-title">Historial — línea de tiempo</h2>
-              <div className="muted">Intervenciones y solicitudes de visita en orden cronológico (más recientes primero)</div>
+              <h2 className="section-title">Etiquetas generadas recientemente</h2>
+              <div className="muted">Identificadores permanentes creados en la base de datos</div>
             </div>
             <ClipboardList size={20} color="#1456c0" />
           </div>
-          {timelineItems.length ? (
-            <ol className="timeline" style={{ marginTop: 18 }}>
-              {timelineItems.map((item, i) => (
-                <li className={`timeline-item${i === timelineItems.length - 1 ? " last" : ""}`} key={`${item.kind}-${item.date.toISOString()}-${i}`}>
-                  <span className={`timeline-dot ${item.kind === "VISITA CONFIRMADA" ? "green" : item.kind === "VISITA RECHAZADA" ? "red" : ""}`} />
-                  <div className="timeline-body">
-                    <div className="timeline-kind">{item.kind}</div>
-                    <div className="item-title">{item.title}</div>
-                    {item.detail ? <div className="item-sub">{item.detail}</div> : null}
-                    <div className="item-sub">
-                      <CalendarClock size={12} style={{ display: "inline", verticalAlign: "-2px" }} />{" "}
-                      {item.date.toLocaleDateString("es-ES")} · {item.date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                      {item.labelCode ? <> · Etiqueta <strong>{item.labelCode}</strong></> : null}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="empty">Aún no hay intervenciones ni solicitudes registradas.</div>
-          )}
-        </section>
-
-        {/* Agenda del administrador con descarga .ics para el teléfono */}
-        <section className="card" id="agenda" style={{ marginTop: 18 }}>
-          <div className="section-head">
-            <div>
-              <h2 className="section-title">Agenda de visitas confirmadas</h2>
-              <div className="muted">Descarga el archivo .ics e impórtalo en el calendario de tu teléfono (Google Calendar, Apple…)</div>
+          {labelList.length ? (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr><th>Código</th><th>Estado</th><th>Lote</th><th>Creada</th><th>Ficha</th></tr>
+                </thead>
+                <tbody>
+                  {labelList.map((label) => (
+                    <tr key={label.id}>
+                      <td><strong>{label.code}</strong></td>
+                      <td><span className={`pill ${label.status === "AVAILABLE" ? "green" : "blue"}`}>{labelStatusLabels[label.status]}</span></td>
+                      <td>{label.batchId ?? "—"}</td>
+                      <td>{label.createdAt.toLocaleDateString("es-ES")} {label.createdAt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td><a href={`/q/${label.uid}`} style={{ color: "#1456c0", fontWeight: 700, fontSize: 12 }}>Abrir →</a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {agendaIcsHref ? (
-              <a className="generate-button" href={agendaIcsHref} download={`agenda-visitas-${new Date().toISOString().slice(0, 10)}.ics`}>
-                <Download size={15} /> Descargar agenda (.ics)
-              </a>
-            ) : (
-              <span className="pill">Sin visitas agendadas</span>
-            )}
-          </div>
-          {confirmedVisits.length ? (
-            <ul className="agenda-list" style={{ marginTop: 14 }}>
-              {confirmedVisits
-                .slice()
-                .sort((a, b) => (a.proposedDate!.getTime() - b.proposedDate!.getTime()))
-                .map((v) => (
-                  <li className="agenda-item" key={v.id}>
-                    <div className="agenda-date">
-                      <strong>{v.proposedDate!.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}</strong>
-                      <span>{v.proposedDate!.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span>
-                    </div>
-                    <div className="agenda-info">
-                      <div className="item-title">{v.customerName}{v.equipment ? <> — <strong>{v.equipment.name}</strong></> : null}</div>
-                      <div className="item-sub"><MapPin size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.address}</div>
-                      <div className="item-sub">
-                        <Mail size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.contactName ?? v.customerName} · {v.contactEmail ?? v.customerEmail}
-                        {v.customerPhone ? <> <Phone size={12} style={{ display: "inline", verticalAlign: "-2px" }} /> {v.customerPhone}</> : null}
-                      </div>
-                    </div>
-                    <a className="agenda-ics" href={`/api/visitas/${v.id}/calendar`} download>
-                      <Download size={13} /> .ics
-                    </a>
-                  </li>
-                ))}
-            </ul>
           ) : (
-            <div className="empty">Cuando un cliente acepte una fecha propuesta, la visita aparecerá aquí lista para descargar al calendario.</div>
+            <div className="empty">No hay etiquetas todavía. Usa el botón “Generar etiquetas” para crear tu primer lote.</div>
           )}
         </section>
 

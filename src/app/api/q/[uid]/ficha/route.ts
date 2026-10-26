@@ -53,18 +53,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     return NextResponse.json({ error: "El nombre y la categoría del equipo son obligatorios." }, { status: 400 });
   }
 
+  const rawStatus = cleanStr(body.status, 20)?.toUpperCase();
+  const status: EquipmentStatus = (STATUSES as string[]).includes(rawStatus ?? "") ? (rawStatus as EquipmentStatus) : "ACTIVE";
+
+  // Datos del cliente (propietario): obligatorios al registrar por primera vez.
   const ownerName = cleanStr(body.ownerName, 160);
   const rawOwnerEmail = cleanStr(body.ownerEmail, 160)?.toLowerCase();
-  if (!ownerName || !rawOwnerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawOwnerEmail)) {
+  const emailOk = !!rawOwnerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawOwnerEmail);
+  if (!ownerName || !emailOk) {
     return NextResponse.json(
-      { error: "Al registrar el equipo por primera vez debes indicar el nombre y el correo del cliente." },
+      { error: "El nombre y un correo válido del cliente son obligatorios." },
       { status: 400 },
     );
   }
-  const ownerEmail = rawOwnerEmail;
-
-  const rawStatus = cleanStr(body.status, 20)?.toUpperCase();
-  const status: EquipmentStatus = (STATUSES as string[]).includes(rawStatus ?? "") ? (rawStatus as EquipmentStatus) : "ACTIVE";
 
   const data = {
     name,
@@ -78,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     status,
     notes: cleanStr(body.notes, 2000) ?? null,
     ownerName,
-    ownerEmail,
+    ownerEmail: rawOwnerEmail ?? null,
     ownerPhone: cleanStr(body.ownerPhone, 40) ?? null,
   };
 
