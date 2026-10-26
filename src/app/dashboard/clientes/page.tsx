@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { Building2, Cpu, Mail, PencilLine, Phone, Search } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import MobileNav from "../mobile-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -58,16 +57,6 @@ export default async function ClientsPage({
 
   return (
     <div className="shell">
-      <MobileNav
-        items={[
-          { href: "/dashboard", icon: "▦", label: "Resumen" },
-          { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
-          { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
-        ]}
-        sessionName={session.name}
-        sessionEmail={session.email}
-        sessionRole={session.role}
-      />
 
       <aside className="sidebar">
         <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>

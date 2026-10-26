@@ -100,3 +100,25 @@
   .topline .avatar{display:none}
   .drawer .side-note,.drawer .logout-button{display:block}
 }
+
+/* ===== Escáner automático de QR (/scan) ===== */
+.scan-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#f3f7fc 0%,#e5efff 100%)}
+.scan-card{width:min(520px,100%);background:#fff;border:1px solid var(--line);border-radius:22px;padding:30px 28px;box-shadow:0 18px 50px #0b254014}
+.scan-region-wrap{position:relative;margin:22px 0 14px;border-radius:16px;overflow:hidden;background:#092746;min-height:300px}
+.scan-region{width:100%;min-height:300px}
+.scan-region video{object-fit:cover;width:100%!important;height:300px!important;border-radius:16px}
+.scan-frame{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 34%,#04152788 100%)}
+.scan-frame::after{content:"";position:absolute;left:50%;top:50%;width:230px;height:230px;transform:translate(-50%,-50%);border:3px solid var(--lime,#a3e635);border-radius:18px;box-shadow:0 0 0 2000px #04152755;animation:scan-pulse 1.6s ease-in-out infinite}
+@keyframes scan-pulse{0%,100%{opacity:.85}50%{opacity:.45}}
+.scan-overlay{position:absolute;inset:0;display:grid;place-items:center;color:#d8e4f2;font-size:14px;padding:20px;text-align:center;background:#092746ee}
+.scan-overlay.error{color:#ffd9d4}
+.scan-status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-height:22px}
+.scan-dot{width:9px;height:9px;border-radius:50%;background:#35c04f;flex-shrink:0;animation:scan-blink 1.2s infinite}
+@keyframes scan-blink{50%{opacity:.35}}
+.scan-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+@media(max-width:680px){
+  .shell{grid-template-rows:auto auto 1fr}
+  .bottom-nav{grid-template-columns:repeat(5,1fr)}
+  .home-simple,.public-wrap,.scan-page{padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
+  .mobile-header .avatar{display:none}
+}
