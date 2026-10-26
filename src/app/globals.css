@@ -65,16 +65,27 @@
 .pill.red{background:#fde3e0;color:#b3261e}
 .generate-status.done{background:#e7f8d5;color:#356d11;border:1px solid #bfe5a5;border-radius:10px;padding:9px 12px;font-size:12.5px}
 
-/* ===== Navegación móvil: barra inferior tipo app + hoja "Más" ===== */
-.mobile-header{display:none;position:sticky;top:0;z-index:60;background:var(--navy);color:#fff;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;box-shadow:0 2px 10px #09274630}
+/* ===== Navegación tipo app: barra inferior en TODAS las pantallas (móvil y desktop) ===== */
+html{padding-bottom:calc(74px + env(safe-area-inset-bottom, 0px))}
+body{overflow-x:hidden}
+.mobile-header{display:flex;position:sticky;top:0;z-index:60;background:var(--navy);color:#fff;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;box-shadow:0 2px 10px #09274630}
 .mobile-header .brand{font-size:16px}
 .mobile-header .brand small{display:none}
+@media(min-width:681px){
+  .mobile-header{padding:12px max(20px, calc((100vw - 1200px) / 2));}
+}
 .menu-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;border:1px solid #2c5078;background:#10335a;color:#fff;cursor:pointer;flex-shrink:0}
 .menu-toggle:hover{background:#173d64}
 .nav-icon{width:20px;text-align:center;display:inline-block}
 
-/* Barra fija inferior (bottom nav) */
-.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:75;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 22px #0b254014;padding:6px 8px calc(6px + env(safe-area-inset-bottom, 0px));grid-template-columns:repeat(5,1fr);gap:2px}
+/* Barra fija inferior (bottom nav) — visible también en escritorio como píldora flotante */
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:75;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 22px #0b254014;padding:6px 8px calc(6px + env(safe-area-inset-bottom, 0px));display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin:0 auto}
+@media(min-width:681px){
+  html{padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px))}
+  .bottom-nav{left:auto;right:auto;bottom:16px;width:min(680px,calc(100vw - 32px));border:1px solid var(--line);border-radius:20px;padding:6px 10px;box-shadow:0 10px 34px #0b254033}
+  .bottom-item{font-size:11.5px;padding:9px 4px}
+  .bottom-item svg{width:22px;height:22px}
+}
 .bottom-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:8px 2px 7px;border-radius:12px;cursor:pointer;text-decoration:none;transition:color .15s ease,background .15s ease;-webkit-tap-highlight-color:transparent}
 .bottom-item svg{width:21px;height:21px}
 .bottom-item.active{color:var(--blue);background:#eef4fb}
@@ -91,14 +102,66 @@
 .sheet .nav a{padding:13px 13px;border-radius:10px;color:#d8e4f2;font-size:14.5px;display:flex;align-items:center}
 .sheet .nav a:active,.sheet .nav a:hover{background:#173d64;color:#fff}
 
+/* ===== Ajustes responsive globales (móvil) ===== */
 @media(max-width:680px){
-  .mobile-header{display:flex}
-  .shell{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .shell{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
   .sidebar{display:none}
-  .bottom-nav{display:grid}
-  .main{padding:20px 14px calc(84px + env(safe-area-inset-bottom, 0px))}
+  .main{padding:20px 14px calc(96px + env(safe-area-inset-bottom, 0px));max-width:100%}
+  .topline,.cal-topline{flex-direction:column;align-items:flex-start}
   .topline .avatar{display:none}
-  .drawer .side-note,.drawer .logout-button{display:block}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .content-grid{grid-template-columns:1fr}
+  .quick-grid{grid-template-columns:1fr}
+  .qr-panel{flex-direction:column;align-items:flex-start}
+  .public-wrap,.scan-page,.home-simple{padding:16px 12px calc(110px + env(safe-area-inset-bottom, 0px))}
+  .mobile-header .avatar{display:none}
+  .sheet{max-height:80vh}
+  table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+}
+
+/* ===== Calendario de visitas (/calendario) ===== */
+.cal-page{min-height:calc(100vh - 74px);max-width:1200px;margin:0 auto;padding:34px 28px;background:var(--bg)}
+.cal-topline{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.cal-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.9fr);gap:18px;align-items:start}
+.cal-card{padding:22px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;font-size:18px;margin-bottom:14px}
+.cal-arrow{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--blue);font-size:20px;display:grid;place-items:center;text-decoration:none;transition:background .15s ease}
+.cal-arrow:hover{background:#eef4fb}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-weekdays{margin-bottom:6px}
+.cal-weekdays span{text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:4px 0}
+.cal-cell{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-height:64px;padding:8px 4px;border-radius:12px;border:1px solid transparent;text-decoration:none;color:var(--ink);background:#f8fafc;transition:background .15s ease,border-color .15s ease}
+.cal-cell:hover{background:#eef4fb}
+.cal-cell.empty-cell{background:transparent;pointer-events:none}
+.cal-cell.today{border-color:var(--blue);background:#e5efff}
+.cal-cell.selected{border-color:var(--navy);background:#dbe8fa;box-shadow:inset 0 0 0 1px var(--navy)}
+.cal-daynum{font-size:13px;font-weight:700}
+.cal-dots{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
+.cal-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+.cal-dot.amber{background:#e0a400}
+.cal-dot.blue{background:#174b9e}
+.cal-dot.green{background:#35c04f}
+.cal-dot.red{background:#d64545}
+.cal-dot.gray{background:#9aa7b4}
+.cal-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--muted)}
+.cal-legend span{display:inline-flex;align-items:center;gap:6px}
+.cal-side{display:grid;gap:18px}
+.pill.gray{background:#eef1f4;color:#5b6b7c}
+.btn-ghost{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--blue);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;text-decoration:none;transition:background .15s ease}
+.btn-ghost:hover{background:#eef4fb}
+.btn-ghost.small{padding:6px 10px;font-size:12px;border-radius:8px}
+.visit-item{flex-wrap:wrap}
+@media(max-width:1000px){
+  .cal-layout{grid-template-columns:1fr}
+  .cal-page{padding:24px 16px}
+}
+@media(max-width:680px){
+  .cal-page{padding:16px 12px calc(110px + env(safe-area-inset-bottom, 0px));min-height:100vh}
+  .cal-cell{min-height:48px;padding:6px 2px;border-radius:8px}
+  .cal-daynum{font-size:12px}
+  .cal-dot{width:6px;height:6px}
+  .cal-card{padding:14px}
+  .visit-item > div:last-child{justify-items:start;text-align:left}
 }
 
 /* ===== Escáner automático de QR (/scan) ===== */
@@ -117,8 +180,5 @@
 @keyframes scan-blink{50%{opacity:.35}}
 .scan-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
 @media(max-width:680px){
-  .shell{grid-template-rows:auto auto 1fr}
-  .bottom-nav{grid-template-columns:repeat(5,1fr)}
-  .home-simple,.public-wrap,.scan-page{padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
-  .mobile-header .avatar{display:none}
+  .scan-page{min-height:calc(100vh - 74px)}
 }

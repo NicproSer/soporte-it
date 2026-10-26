@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ScanLine, Users, Wallet } from "lucide-react";
+import { CalendarDays, ScanLine, Users, Wallet } from "lucide-react";
 import { LogoutButton } from "./actions";
+
+/** Icono de calendario en SVG inline (mismo estilo que el resto de la barra). */
+function CalendarIcon() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </svg>
+  );
+}
 
 /** Icono de QR simple en SVG (evita dependencias extra). */
 function QrScannerIcon() {
@@ -27,9 +37,11 @@ type Props = {
 };
 
 /**
- * Navegación móvil estilo aplicación nativa: barra fija INFERIOR (bottom nav)
- * con hasta 5 secciones + un botón "Más" que abre una hoja (sheet) con el
- * resto de enlaces y la sesión. En escritorio no se renderiza nada.
+ * Navegación estilo aplicación nativa disponible en TODAS las pantallas
+ * (móvil, tablet y escritorio): barra fija INFERIOR (bottom nav) con 5
+ * secciones + un botón "Más" que abre una hoja (sheet) con el resto de
+ * enlaces, la agenda y la sesión. En escritorio la barra se muestra centrada
+ * como una píldora flotante.
  */
 export default function MobileNav({ items, sessionName, sessionEmail, sessionRole }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -62,11 +74,12 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  // Secciones principales del bottom bar (máx. 4 + "Más").
-  // Disponible en TODAS las páginas cuando hay sesión de ADMIN/TECHNICIAN.
+  // Secciones principales del bottom bar (5 + "Más").
+  // Disponible en TODAS las páginas y pantallas cuando hay sesión de ADMIN/TECHNICIAN.
   const primary: BottomItem[] = [
     { href: "/dashboard", label: "Panel", icon: <Wallet size={21} /> },
     { href: "/scan", label: "Escanear", icon: <ScanLine size={21} /> },
+    { href: "/calendario", label: "Agenda", icon: <CalendarIcon />, match: (p) => p === "/calendario" || p.startsWith("/calendario/") },
     { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/q/") },
     { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} /> },
   ];

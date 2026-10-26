@@ -8,9 +8,8 @@ import MobileNav, { type MobileNavItem } from "@/app/dashboard/mobile-nav";
  * JWT_SECRET no está configurado, simplemente no muestra nada.
  */
 const items: MobileNavItem[] = [
-  { href: "/dashboard", icon: "▦", label: "Resumen" },
-  { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
-  { href: "/dashboard/clientes", icon: "☷", label: "Clientes" },
+  { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+  { href: "/dashboard#historial", icon: "☷", label: "Intervenciones" },
 ];
 
 export default async function SessionNav() {
