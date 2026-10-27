@@ -44,7 +44,12 @@ model User {
   // true si la contraseña sigue siendo la temporal generada al crear la
   // cuenta desde el panel (el usuario debe cambiarla al primer ingreso).
   mustChangePassword Boolean    @default(false)
-  resetTokenHash   String?      @unique
+  // NOTE: intentionally NOT @unique. MongoDB treats every missing/null field
+  // as the same value for unique indexes, so creating a second user without a
+  // reset token fails with P2002 on `User_resetTokenHash_key`. Uniqueness by
+  // token is guaranteed by the SHA-256 hash itself (crypto-random); lookups
+  // use findFirst and tokens are single-use (cleared after use).
+  resetTokenHash   String?
   resetTokenExpiresAt DateTime?
   interventions Intervention[]
   acceptedVisits    VisitRequest[] @relation("AcceptedVisits")

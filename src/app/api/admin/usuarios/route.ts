@@ -47,8 +47,19 @@ export async function POST(req: Request) {
 
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
+  // `resetTokenHash` / `resetTokenExpiresAt` se dejan explícitos en null:
+  // así el documento nuevo nunca hereda un hash huérfano y la búsqueda por
+  // token de recuperación solo puede coincidir con enlaces realmente emitidos.
   const user = await prisma.user.create({
-    data: { name, email, role, passwordHash, mustChangePassword: true },
+    data: {
+      name,
+      email,
+      role,
+      passwordHash,
+      mustChangePassword: true,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+    },
   });
 
   // El usuario ya quedó creado; el correo de bienvenida va en segundo plano
