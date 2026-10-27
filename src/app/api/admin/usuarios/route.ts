@@ -60,19 +60,41 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 }
 
-const resetSchema = z.object({ userId: z.string().min(1) });
+const actionSchema = z.object({
+  userId: z.string().min(1),
+  action: z.enum(["reset", "role"]),
+  role: z.enum(["ADMIN", "TECHNICIAN"]).optional(),
+});
 
-/** Reset desde el panel: genera enlace temporal y lo envía al correo del usuario. */
+/** Acciones del panel sobre una cuenta: reset de contraseña o cambio de permiso. */
 export async function PUT(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
-  const parsed = resetSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Falta el usuario." }, { status: 400 });
+  const parsed = actionSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+  const { action, role } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
   if (!user) return NextResponse.json({ error: "Usuario no encontrado." }, { status: 404 });
 
+  // Cambio de permiso (ADMIN ⇄ TECHNICIAN). No permite degradarse a sí mismo
+  // para evitar quedar sin administradores en el sistema.
+  if (action === "role") {
+    if (!role) return NextResponse.json({ error: "Falta el nuevo permiso." }, { status: 400 });
+    if (user.id === session.sub && role !== "ADMIN") {
+      return NextResponse.json({ error: "No puedes quitarte tu propio permiso de administrador." }, { status: 400 });
+    }
+    if (role === user.role) return NextResponse.json({ ok: true, unchanged: true });
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return NextResponse.json({ ok: true, user: updated });
+  }
+
+  // Reset de contraseña: enlace temporal enviado al correo del usuario.
   const rawToken = crypto.randomBytes(32).toString("hex");
   await prisma.user.update({
     where: { id: user.id },

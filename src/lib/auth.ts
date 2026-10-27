@@ -57,6 +57,16 @@ export async function getSession(): Promise<SessionPayload | null> {
   }
 }
 
+/** Versión tolerante a fallos para componentes del layout global: si falta
+ * JWT_SECRET o el token es inválido devuelve null en lugar de lanzar. */
+export async function getSessionSafe(): Promise<SessionPayload | null> {
+  try {
+    return await getSession();
+  } catch {
+    return null;
+  }
+}
+
 export async function destroySession() {
   (await cookies()).delete(SESSION_COOKIE);
 }

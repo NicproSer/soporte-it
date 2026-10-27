@@ -80,6 +80,7 @@ export default async function DashboardPage() {
   // ADMIN/TECHNICIAN, por lo que aquí ya no existe un sidebar aparte.
   const navItems: MobileNavItem[] = [
     { href: "/dashboard", icon: "▦", label: "Resumen" },
+    { href: "/dashboard/usuarios", icon: "⚿", label: "Usuarios y accesos" },
     { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
     { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
     { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
