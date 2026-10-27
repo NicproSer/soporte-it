@@ -41,7 +41,14 @@ model User {
   email         String          @unique
   passwordHash  String
   role          UserRole        @default(TECHNICIAN)
+  // true si la contraseña sigue siendo la temporal generada al crear la
+  // cuenta desde el panel (el usuario debe cambiarla al primer ingreso).
+  mustChangePassword Boolean    @default(false)
+  resetTokenHash   String?      @unique
+  resetTokenExpiresAt DateTime?
   interventions Intervention[]
+  acceptedVisits    VisitRequest[] @relation("AcceptedVisits")
+  closedVisits      VisitRequest[] @relation("ClosedVisits")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -88,6 +95,8 @@ model Intervention {
   equipment   Equipment @relation(fields: [equipmentId], references: [id])
   technicianId String   @db.ObjectId
   technician  User      @relation(fields: [technicianId], references: [id])
+  visitRequestId String? @db.ObjectId
+  visitRequest   VisitRequest? @relation(fields: [visitRequestId], references: [id])
   type        String
   description String
   performedAt DateTime  @default(now())
@@ -119,8 +128,17 @@ model VisitRequest {
   customerNote        String?
   // true si el correo de propuesta al cliente falló (se puede reintentar desde el dashboard)
   proposalEmailFailed Boolean       @default(false)
+  // Flujo tipo tickets: quién aceptó la solicitud y quién cerró la visita
+  acceptedById        String?       @db.ObjectId
+  acceptedBy          User?         @relation("AcceptedVisits", fields: [acceptedById], references: [id])
+  acceptedAt          DateTime?
+  closedById          String?       @db.ObjectId
+  closedBy            User?         @relation("ClosedVisits", fields: [closedById], references: [id])
+  closedAt            DateTime?
+  completionNotes     String?
   equipmentId         String?     @db.ObjectId
   equipment           Equipment?  @relation(fields: [equipmentId], references: [id])
+  interventions       Intervention[]
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 }

@@ -14,6 +14,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GenerateLabelsButton } from "./actions";
+import CloseTicketForm from "./close-ticket-form";
 import { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
       prisma.equipment.count(),
       prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED"] } } }),
       prisma.intervention.count(),
-      prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true } }),
+      prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true, acceptedBy: true, closedBy: true } }),
       prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }),
       prisma.label.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     ]);
@@ -149,8 +150,25 @@ export default async function DashboardPage() {
                       <span className={`pill ${visit.status === "COMPLETED" || visit.status === "CONFIRMED" ? "green" : visit.status === "REJECTED" ? "red" : visit.status === "PROPOSED" ? "blue" : ""}`}>
                         {visitStatusLabels[visit.status] ?? visit.status}
                       </span>
+                      {visit.acceptedBy ? (
+                        <div className="item-sub" style={{ marginTop: 4 }}>
+                          👤 Aceptada por <strong>{visit.acceptedBy.name}</strong>
+                          {visit.acceptedAt ? ` · ${visit.acceptedAt.toLocaleDateString("es-ES")}` : ""}
+                        </div>
+                      ) : null}
+                      {visit.closedBy ? (
+                        <div className="item-sub" style={{ marginTop: 2, color: visit.status === "COMPLETED" ? "#2e7d32" : "#b3261e" }}>
+                          ✔ Cerrada por <strong>{visit.closedBy.name}</strong>
+                          {visit.completionNotes ? ` — ${visit.completionNotes.slice(0, 90)}` : ""}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8 }}>
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
+                        {(visit.status === "CONFIRMED" || visit.status === "PROPOSED") && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
+                          <div style={{ marginTop: 8 }}>
+                            <CloseTicketForm visitId={visit.id} customerName={visit.customerName} />
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

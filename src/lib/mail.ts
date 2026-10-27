@@ -19,6 +19,29 @@ export function getAdminRecipients(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Destinatarios de las notificaciones internas (flujo tipo tickets):
+ * TODOS los usuarios registrados como ADMIN o TECHNICIAN en la base de
+ * datos. Si además hay correos definidos en MAIL_TO_ADMIN (legado), se
+ * incluyen sin duplicar. Así, al crear un técnico/administrador desde el
+ * panel, sus avisos quedan activos automáticamente sin tocar el .env.
+ */
+export async function getTeamRecipients(): Promise<string[]> {
+  const emails: string[] = [];
+  try {
+    const { prisma } = await import("./prisma");
+    const users = await prisma.user.findMany({
+      where: { role: { in: ["ADMIN", "TECHNICIAN"] } },
+      select: { email: true },
+    });
+    emails.push(...users.map((u) => u.email));
+  } catch (e) {
+    console.error("[mail] no se pudo leer el equipo desde la BD:", e);
+  }
+  emails.push(...getAdminRecipients());
+  return [...new Set(emails.map((e) => e.toLowerCase().trim()).filter(Boolean))];
+}
+
 function getTransporter() {
   const host = process.env.SMTP_HOST ?? "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT ?? 465);
@@ -162,7 +185,7 @@ export async function sendNewVisitRequestEmail(v: {
      <div style="margin-top:22px">${btn(dashboardUrl, "Ingresar al panel y proponer fecha →")}</div>`,
     `ID de solicitud: ${v.id} · Este correo se envió automáticamente desde ${appUrl()}`
   );
-  await sendMail(getAdminRecipients(), `[Soporte IT] Nueva solicitud de visita — ${v.customerName}`, html);
+  await sendMail(await getTeamRecipients(), `[Soporte IT] Nueva solicitud de visita — ${v.customerName}`, html);
 }
 
 /** Correo al cliente con los botones Aceptar / Rechazar / Proponer otra fecha. */
@@ -228,5 +251,94 @@ export async function sendClientResponseToAdminsEmail(v: {
      <div style="margin-top:22px">${btn(`${appUrl()}/dashboard`, "Ver en el panel →")}</div>`,
     `ID de solicitud: ${v.id}`
   );
-  await sendMail(getAdminRecipients(), `[Soporte IT] ${titles[v.action]} — ${v.customerName}`, html);
+  await sendMail(await getTeamRecipients(), `[Soporte IT] ${titles[v.action]} — ${v.customerName}`, html);
+}
+
+/** Correo de bienvenida con credenciales al crear un admin/técnico desde el panel. */
+export async function sendWelcomeEmail(u: {
+  name: string;
+  email: string;
+  role: "ADMIN" | "TECHNICIAN";
+  tempPassword: string;
+}) {
+  const roleName = u.role === "ADMIN" ? "Administrador" : "Técnico";
+  const html = shell(
+    `Bienvenido al sistema de Soporte IT`,
+    `Tu cuenta de ${roleName} fue creada`,
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${u.name}</strong>, un administrador te registró en el sistema. Estos son tus datos de acceso:</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+       ${row("Correo", u.email)}
+       ${row("Contraseña", `<code style="background:#eef3f9;border:1px solid #d5e0ee;border-radius:6px;padding:4px 8px;font-size:14px;font-weight:700">${u.tempPassword}</code>`)}
+       ${row("Permiso", roleName)}
+     </table>
+     <p style="margin:14px 0 0;font-size:13px;color:#42546a;line-height:1.6">Por seguridad, al iniciar sesión por primera vez deberás <strong>cambiar esta contraseña temporal</strong>.</p>
+     <div style="margin-top:22px">${btn(`${appUrl()}/login`, "Iniciar sesión →")}</div>`,
+    `Si no esperabas este correo, ignóralo.`
+  );
+  await sendMail([u.email], `[Soporte IT] Tus datos de acceso (${roleName})`, html);
+}
+
+/** Correo con enlace para restablecer la contraseña (reset desde el panel). */
+export async function sendPasswordResetEmail(u: { name: string; email: string; token: string }) {
+  const url = `${appUrl()}/reset-password?token=${u.token}`;
+  const html = shell(
+    "Restablecimiento de contraseña",
+    "Solicitud realizada desde el panel administrativo",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${u.name}</strong>, se solicitó un cambio de contraseña para tu cuenta.</p>
+     <div style="margin:6px 0 16px">${btn(url, "Establecer nueva contraseña →")}</div>
+     <p style="font-size:12px;color:#42546a;line-height:1.6">Este enlace vence en <strong>2 horas</strong> y solo funciona una vez. Si el botón no abre, copia esta dirección:<br/><span style="word-break:break-all">${url}</span></p>`,
+    `Si no solicitaste el cambio, contacta a tu administrador.`
+  );
+  await sendMail([u.email], "[Soporte IT] Restablece tu contraseña", html);
+}
+
+/** Recordatorio interno: visita confirmada → cerrar ticket e informar si se completó. */
+export async function sendVisitReminderEmail(v: {
+  id: string;
+  customerName: string;
+  address: string;
+  proposedDate?: Date | null;
+  acceptedByName?: string | null;
+  equipmentName?: string | null;
+}) {
+  const html = shell(
+    "Recordatorio: visita programada pendiente de cierre",
+    "Acción requerida por el equipo técnico",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">La visita confirmada de <strong>${v.customerName}</strong> requiere seguimiento: cuando sea atendida, quien la gestionó debe ingresar al panel e indicar si la tarea <strong>se completó o no</strong>, con la información del servicio. Ese registro quedará enlazado al historial del dispositivo.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+       ${v.equipmentName ? row("Equipo", v.equipmentName) : ""}
+       ${row("Dirección", v.address)}
+       ${v.proposedDate ? row("Fecha agendada", formatDate(v.proposedDate)) : ""}
+       ${v.acceptedByName ? row("Aceptada por", v.acceptedByName) : ""}
+     </table>
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard#visitas`, "Abrir el ticket →")}</div>`,
+    `ID de solicitud: ${v.id}`
+  );
+  await sendMail(await getTeamRecipients(), `[Soporte IT] Recordatorio de visita — ${v.customerName}`, html);
+}
+
+/** Ticket cerrado: resultado final de la visita al equipo. */
+export async function sendTicketClosedEmail(v: {
+  id: string;
+  customerName: string;
+  completed: boolean;
+  notes: string;
+  closedByName: string;
+  equipmentName?: string | null;
+}) {
+  const html = shell(
+    v.completed ? "Visita COMPLETADA ✔" : "Visita NO completada ✕",
+    "Cierre de ticket con informe técnico",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6"><strong>${v.closedByName}</strong> cerró el ticket indicando que la tarea ${v.completed ? "SE COMPLETÓ" : "NO se completó"}.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+       ${row("Cliente", v.customerName)}
+       ${v.equipmentName ? row("Equipo", v.equipmentName) : ""}
+       ${row("Resultado", v.completed ? '<span style="color:#2e7d32;font-weight:700">Completada</span>' : '<span style="color:#b3261e;font-weight:700">No completada</span>')}
+       ${row("Informe", v.notes)}
+     </table>
+     <p style="margin:14px 0 0;font-size:12px;color:#42546a">El detalle quedó enlazado al historial del dispositivo.</p>
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard#historial`, "Ver historial →")}</div>`,
+    `ID de solicitud: ${v.id}`
+  );
+  await sendMail(await getTeamRecipients(), `[Soporte IT] Ticket ${v.completed ? "completado" : "no completado"} — ${v.customerName}`, html);
 }
