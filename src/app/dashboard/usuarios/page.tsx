@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CreateForm, type UserRow } from "./create-form";
 import { UserActions } from "./user-actions";
+import { EditUserForm } from "./edit-user-form";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,7 @@ export default async function UsuariosPage() {
                       </td>
                       <td>
                         <UserActions userId={u.id} currentRole={u.role} isSelf={u.id === session.sub} />
+                        <EditUserForm userId={u.id} initialName={u.name} initialEmail={u.email} />
                       </td>
                     </tr>
                   ))}
