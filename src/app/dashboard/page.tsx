@@ -56,7 +56,9 @@ export default async function DashboardPage() {
       prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED"] } } }),
       prisma.intervention.count(),
       prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true, acceptedBy: true, closedBy: true } }),
-      prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }),
+      // `label` es opcional (setNull): si se borran las etiquetas de la BD,
+      // los equipos quedan sin label y antes esto lanzaba TypeError -> 500.
+      prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }).then((rows) => rows.filter((eq) => eq.label !== null)),
       prisma.label.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     ]);
 
@@ -195,11 +197,11 @@ export default async function DashboardPage() {
                     <div>
                       <div className="item-title">{eq.name}</div>
                       <div className="item-sub">{eq.category}{eq.brand ? ` · ${eq.brand}` : ""}{eq.model ? ` ${eq.model}` : ""}</div>
-                      <div className="item-sub">{eq.label?.code} · {eq.location || "Sin ubicación"}</div>
+                      <div className="item-sub">{eq.label.code} · {eq.location || "Sin ubicación"}</div>
                     </div>
                     <div style={{ textAlign: "right", display: "grid", gap: 6, justifyItems: "end" }}>
                       <span className={`pill ${eq.status === "ACTIVE" ? "green" : ""}`}>{equipmentStatusLabels[eq.status] ?? eq.status}</span>
-                      <a href={`/q/${eq.label?.uid}`} style={{ fontSize: 12, fontWeight: 700, color: "#1456c0" }}>Ver ficha →</a>
+                      <a href={`/q/${eq.label.uid}`} style={{ fontSize: 12, fontWeight: 700, color: "#1456c0" }}>Ver ficha →</a>
                     </div>
                   </div>
                 ))}

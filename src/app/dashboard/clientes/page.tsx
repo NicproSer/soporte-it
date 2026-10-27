@@ -37,11 +37,13 @@ export default async function ClientsPage({
       }
     : { ownerEmail: { not: null as unknown as undefined } };
 
-  const equipmentList = await prisma.equipment.findMany({
+  const equipmentList = (await prisma.equipment.findMany({
     where,
     orderBy: [{ ownerName: "asc" }, { createdAt: "desc" }],
     include: { label: true, visits: { orderBy: { createdAt: "desc" } } },
-  });
+    // `label` es opcional: si se eliminan las etiquetas de la BD hay equipos
+    // sin label y antes esto reventaba con TypeError -> error del servidor.
+  })).filter((eq) => eq.label !== null);
 
   // Agrupar equipos por cliente (correo normalizado a minúsculas).
   const groups = new Map<string, { name: string; email: string; phone?: string | null; items: typeof equipmentList }>();
