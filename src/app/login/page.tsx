@@ -28,6 +28,13 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+      // Si la cuenta aún usa la contraseña temporal generada desde el panel,
+      // obliga a cambiarla antes de continuar (flujo de bienvenida seguro).
+      if (data.mustChangePassword) {
+        router.replace("/cambiar-contrasena?obligatorio=1");
+        router.refresh();
+        return;
+      }
       router.replace(data.redirect ?? "/dashboard");
       router.refresh();
     } catch {

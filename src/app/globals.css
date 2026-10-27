@@ -216,3 +216,17 @@ body{overflow-x:hidden}
 @media(max-width:680px){
   .scan-page{min-height:100vh}
 }
+
+/* ==== Gestión de usuarios y contraseñas ==== */
+.form-stack{display:grid;gap:14px}
+.form-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.form-field{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.form-field input,.form-field select,.form-field textarea{padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;background:#fff;color:var(--ink);width:100%}
+.form-field input:focus,.form-field select:focus{outline:2px solid #1456c033;border-color:#1456c0}
+.btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--blue);color:#fff;border:0;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;width:fit-content}
+.btn-primary:hover:not(:disabled){background:#0f47a5}
+.btn-primary:disabled{opacity:.65;cursor:wait}
+.form-feedback{font-size:13px;padding:10px 12px;border-radius:10px;line-height:1.5}
+.form-feedback.ok{background:#e7f8d5;color:#356d11;border:1px solid #bfe3a1}
+.form-feedback.error{background:#fdecec;color:#9c2b2b;border:1px solid #f3b9b9}
+@media(max-width:900px){.form-grid-3{grid-template-columns:1fr}.btn-primary{width:100%}}

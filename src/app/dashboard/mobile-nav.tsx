@@ -153,6 +153,11 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
           <span className="pill blue">{sessionRole === "ADMIN" ? "Administrador" : sessionRole === "TECHNICIAN" ? "Técnico" : "Sesión"}</span>
         </div>
         <nav className="nav" aria-label="Secciones adicionales">
+          {sessionRole === "ADMIN" ? (
+            <a href="/cambiar-contrasena">
+              <span className="nav-icon" aria-hidden="true">⚿</span>&nbsp;Mi cuenta — cambiar contraseña
+            </a>
+          ) : null}
           {secondary.map((item) => (
             <a key={item.href} href={item.href}>
               <span className="nav-icon" aria-hidden="true">{item.icon}</span>&nbsp;{item.label}

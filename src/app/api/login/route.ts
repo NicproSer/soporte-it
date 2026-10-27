@@ -27,5 +27,18 @@ export async function POST(request: Request) {
   // dirigidos a la búsqueda de etiquetas para llenar fichas técnicas.
   const redirect = user.role === "ADMIN" ? "/dashboard" : "/equipos";
   await setSessionCookie({ sub: user.id, email: user.email, name: user.name, role: user.role });
-  return NextResponse.json({ ok: true, role: user.role, redirect });
+  return NextResponse.json({ ok: true, role: user.role, redirect, mustChangePassword: user.mustChangePassword });
+}
+
+/** Datos de la cuenta en sesión (nombre, correo, permiso y estado de contraseña). */
+export async function GET() {
+  const { getSession } = await import("@/lib/auth");
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Sin sesión." }, { status: 401 });
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { id: true, name: true, email: true, role: true, mustChangePassword: true },
+  });
+  if (!user) return NextResponse.json({ error: "Usuario no encontrado." }, { status: 404 });
+  return NextResponse.json({ user });
 }

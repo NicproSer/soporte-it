@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getSessionSafe } from "@/lib/auth";
 import MobileNav, { type MobileNavItem } from "@/app/dashboard/mobile-nav";
 
 /**
@@ -9,6 +9,8 @@ import MobileNav, { type MobileNavItem } from "@/app/dashboard/mobile-nav";
  */
 const items: MobileNavItem[] = [
   { href: "/dashboard", icon: "▦", label: "Resumen" },
+  { href: "/dashboard/usuarios", icon: "⚿", label: "Usuarios y accesos" },
+  { href: "/dashboard/clientes", icon: "☗", label: "Clientes" },
   { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
   { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
   { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
@@ -16,12 +18,7 @@ const items: MobileNavItem[] = [
 ];
 
 export default async function SessionNav() {
-  let session;
-  try {
-    session = await getSession();
-  } catch {
-    return null; // JWT_SECRET ausente → sin menú
-  }
+  const session = await getSessionSafe();
   if (!session || (session.role !== "ADMIN" && session.role !== "TECHNICIAN")) {
     return null;
   }
