@@ -4,7 +4,8 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendWelcomeEmail, sendPasswordResetEmail } from "@/lib/mail";
+import { sendWelcomeEmail, sendPasswordResetEmail, sendMail } from "@/lib/mail";
+import { createSession, SESSION_COOKIE } from "@/lib/auth";
 import { generateTempPassword, hashToken } from "@/lib/passwords";
 
 const createSchema = z.object({
@@ -73,21 +74,73 @@ export async function POST(req: Request) {
 
 const actionSchema = z.object({
   userId: z.string().min(1),
-  action: z.enum(["reset", "role"]),
+  action: z.enum(["reset", "role", "edit"]),
   role: z.enum(["ADMIN", "TECHNICIAN"]).optional(),
+  name: z.string().trim().min(2, "Indica el nombre completo.").max(120).optional(),
+  email: z.string().trim().email("Correo electrónico inválido.").max(160).optional(),
 });
 
-/** Acciones del panel sobre una cuenta: reset de contraseña o cambio de permiso. */
+/** Acciones del panel sobre una cuenta: editar datos, reset de contraseña o cambio de permiso. */
 export async function PUT(req: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   const parsed = actionSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Datos inválidos." }, { status: 400 });
   const { action, role } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
   if (!user) return NextResponse.json({ error: "Usuario no encontrado." }, { status: 404 });
+
+  // Edición de datos (nombre / correo) desde la tabla de cuentas.
+  if (action === "edit") {
+    const name = parsed.data.name?.trim();
+    const email = parsed.data.email?.trim().toLowerCase();
+    if (!name && !email) return NextResponse.json({ error: "No hay cambios que guardar." }, { status: 400 });
+
+    const data: { name?: string; email?: string } = {};
+    if (name && name !== user.name) data.name = name;
+    if (email && email !== user.email.toLowerCase()) {
+      const clash = await prisma.user.findUnique({ where: { email } });
+      if (clash) return NextResponse.json({ error: "Ya existe otra cuenta con ese correo." }, { status: 409 });
+      data.email = email;
+    }
+    if (Object.keys(data).length === 0) return NextResponse.json({ ok: true, unchanged: true });
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data,
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    // Si el admin editó SU propia cuenta, re-firma la cookie para que el
+    // nombre/correo nuevos se reflejen en toda la interfaz sin cerrar sesión.
+    if (user.id === session.sub) {
+      const token = await createSession({ sub: updated.id, email: updated.email, name: updated.name, role: updated.role });
+      const res = NextResponse.json({ ok: true, user: updated });
+      res.cookies.set(SESSION_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 8,
+      });
+      return res;
+    }
+
+    // Aviso por correo al usuario cuya cuenta fue modificada (no bloquea la respuesta).
+    if (data.email) {
+      void sendMail(
+        [updated.email],
+        "Tu cuenta de Soporte IT fue actualizada",
+        `<p>Hola ${updated.name}, un administrador actualizó los datos de tu cuenta.</p>` +
+          `<p>Tu nuevo correo de acceso es <strong>${updated.email}</strong> (la contraseña no cambió).</p>`,
+        `Tu cuenta de Soporte IT ahora usa el correo ${updated.email}.`
+      ).catch((e) => console.error("[usuarios] aviso de edición no enviado:", e));
+    }
+
+    return NextResponse.json({ ok: true, user: updated });
+  }
 
   // Cambio de permiso (ADMIN ⇄ TECHNICIAN). No permite degradarse a sí mismo
   // para evitar quedar sin administradores en el sistema.
