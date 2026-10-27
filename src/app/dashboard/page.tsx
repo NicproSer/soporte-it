@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { GenerateLabelsButton, LogoutButton } from "./actions";
-import MobileNav, { type MobileNavItem } from "./mobile-nav";
+import { GenerateLabelsButton } from "./actions";
+import CloseTicketForm from "./close-ticket-form";
+import { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
       prisma.equipment.count(),
       prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED"] } } }),
       prisma.intervention.count(),
-      prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true } }),
+      prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true, acceptedBy: true, closedBy: true } }),
       prisma.equipment.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { label: true } }),
       prisma.label.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     ]);
@@ -73,37 +74,21 @@ export default async function DashboardPage() {
     .join("")
     .toUpperCase();
 
+  // Enlaces adicionales que aparecen en la hoja "Más" del menú global.
+  // El MISMO menú (barra inferior + hoja) se usa en móvil y en desktop:
+  // se renderiza desde el layout raíz (SessionNav) cuando hay sesión de
+  // ADMIN/TECHNICIAN, por lo que aquí ya no existe un sidebar aparte.
   const navItems: MobileNavItem[] = [
-    { href: "#inicio", icon: "▦", label: "Resumen" },
-    { href: "/equipos", icon: "✎", label: "Fichas técnicas" },
-    { href: "#etiquetas", icon: "▧", label: "Etiquetas QR" },
-    { href: "#equipos", icon: "▣", label: "Equipos" },
-    { href: "#visitas", icon: "◷", label: "Visitas técnicas" },
-    { href: "#historial", icon: "☷", label: "Intervenciones" },
+    { href: "/dashboard", icon: "▦", label: "Resumen" },
+    { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
+    { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
+    { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "/dashboard#historial", icon: "☷", label: "Intervenciones" },
+    { href: "/dashboard/clientes", icon: "◉", label: "Clientes y dispositivos" },
   ];
 
   return (
-    <div className="shell">
-      <MobileNav items={navItems} sessionName={session.name} sessionEmail={session.email} sessionRole={session.role} />
-
-      <aside className="sidebar">
-        <div className="brand">SOPORTE IT<small>GESTIÓN TÉCNICA</small></div>
-        <nav className="nav" aria-label="Navegación principal">
-          {navItems.map((item) => (
-            <a key={item.href} className={item.href === "#inicio" ? "active" : undefined} href={item.href}>
-              {item.icon} &nbsp;{item.label}
-            </a>
-          ))}
-          <a href="/dashboard/clientes">◈ &nbsp;Clientes y dispositivos</a>
-        </nav>
-        <div className="side-note">
-          Sesión de administrador:<br />
-          <strong style={{ color: "#fff" }}>{session.name}</strong><br />
-          {session.email}
-          <div style={{ marginTop: 12 }}><LogoutButton /></div>
-        </div>
-      </aside>
-
+    <div className="shell shell-single">
       <main className="main" id="inicio">
         <div className="topline">
           <div>
@@ -165,8 +150,25 @@ export default async function DashboardPage() {
                       <span className={`pill ${visit.status === "COMPLETED" || visit.status === "CONFIRMED" ? "green" : visit.status === "REJECTED" ? "red" : visit.status === "PROPOSED" ? "blue" : ""}`}>
                         {visitStatusLabels[visit.status] ?? visit.status}
                       </span>
+                      {visit.acceptedBy ? (
+                        <div className="item-sub" style={{ marginTop: 4 }}>
+                          👤 Aceptada por <strong>{visit.acceptedBy.name}</strong>
+                          {visit.acceptedAt ? ` · ${visit.acceptedAt.toLocaleDateString("es-ES")}` : ""}
+                        </div>
+                      ) : null}
+                      {visit.closedBy ? (
+                        <div className="item-sub" style={{ marginTop: 2, color: visit.status === "COMPLETED" ? "#2e7d32" : "#b3261e" }}>
+                          ✔ Cerrada por <strong>{visit.closedBy.name}</strong>
+                          {visit.completionNotes ? ` — ${visit.completionNotes.slice(0, 90)}` : ""}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8 }}>
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
+                        {(visit.status === "CONFIRMED" || visit.status === "PROPOSED") && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
+                          <div style={{ marginTop: 8 }}>
+                            <CloseTicketForm visitId={visit.id} customerName={visit.customerName} />
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

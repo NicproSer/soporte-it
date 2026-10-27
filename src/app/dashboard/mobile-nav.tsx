@@ -2,8 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CalendarClock, LayoutDashboard, QrCode, Users } from "lucide-react";
+import { CalendarDays, ScanLine, Users, Wallet } from "lucide-react";
 import { LogoutButton } from "./actions";
+
+/** Icono de calendario en SVG inline (mismo estilo que el resto de la barra). */
+function CalendarIcon() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </svg>
+  );
+}
+
+/** Icono de QR simple en SVG (evita dependencias extra). */
+function QrScannerIcon() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <rect x="9" y="9" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
 
 export type MobileNavItem = { href: string; icon: string; label: string };
 
@@ -17,9 +37,11 @@ type Props = {
 };
 
 /**
- * Navegación móvil estilo aplicación nativa: barra fija INFERIOR (bottom nav)
- * con hasta 5 secciones + un botón "Más" que abre una hoja (sheet) con el
- * resto de enlaces y la sesión. En escritorio no se renderiza nada.
+ * Navegación estilo aplicación nativa disponible en TODAS las pantallas
+ * (móvil, tablet y escritorio): barra fija INFERIOR (bottom nav) con 5
+ * secciones + un botón "Más" que abre una hoja (sheet) con el resto de
+ * enlaces, la agenda y la sesión. En escritorio la barra se muestra centrada
+ * como una píldora flotante.
  */
 export default function MobileNav({ items, sessionName, sessionEmail, sessionRole }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -46,21 +68,37 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
     return () => window.removeEventListener("keydown", onKey);
   }, [moreOpen]);
 
-  const isHome = pathname === "/dashboard";
-  const isActive = (href: string) => {
-    if (href.startsWith("#")) return isHome; // anclas viven en /dashboard
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
-
-  // Secciones principales del bottom bar (máx. 4 + "Más")
+  // Secciones principales del bottom bar (5 + "Más").
+  // Disponible en TODAS las páginas y pantallas cuando hay sesión de ADMIN/TECHNICIAN.
   const primary: BottomItem[] = [
-    { href: "#inicio", label: "Resumen", icon: <LayoutDashboard size={21} />, match: () => isHome && !pathname.includes("clientes") },
-    { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} /> },
-    { href: "/equipos", label: "Fichas", icon: <QrCode size={21} /> },
-    { href: "#visitas", label: "Visitas", icon: <CalendarClock size={21} />, match: () => isHome },
+    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} />, match: (p) => p === "/dashboard" || (p.startsWith("/dashboard/") && !p.startsWith("/dashboard/clientes")) },
+    { href: "/scan", label: "Escanear", icon: <ScanLine size={21} /> },
+    { href: "/calendario", label: "Agenda", icon: <CalendarIcon />, match: (p) => p === "/calendario" || p.startsWith("/calendario/") },
+    { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/equipos/") || p.startsWith("/q/") },
+    { href: "/dashboard/clientes", label: "Clientes", icon: <Users size={21} />, match: (p) => p.startsWith("/dashboard/clientes") },
   ];
 
-  const secondary = items.filter((i) => !primary.some((p) => p.href === i.href));
+  const isActive = (href: string) => {
+    // Quitamos el ancla (#seccion) para comparar la ruta base.
+    const clean = href.split("#")[0];
+    if (clean === "/dashboard") {
+      return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+    }
+    return pathname === clean || pathname.startsWith(`${clean}/`);
+  };
+
+  // Deduplica: si un enlace adicional apunta a una sección que ya cubre un
+  // botón principal (ej. /dashboard#visitas → Panel), no se repite en "Más".
+  const coveredByPrimary = (href: string) => {
+    const clean = href.split("#")[0];
+    return primary.some((p) => {
+      const pc = p.href.split("#")[0];
+      if (pc === "/dashboard") return clean === "/dashboard";
+      return clean === pc || clean.startsWith(`${pc}/`);
+    });
+  };
+
+  const secondary = items.filter((i) => !coveredByPrimary(i.href));
 
   return (
     <>
@@ -68,6 +106,9 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
         <div className="brand">
           SOPORTE IT<small>GESTIÓN TÉCNICA</small>
         </div>
+        <a href="/scan" className="menu-toggle" aria-label="Escanear etiqueta QR" style={{ display: "flex", alignItems: "center", gap: 6, color: "#fff", fontSize: 13, textDecoration: "none" }}>
+          <ScanLine size={20} /> Escanear
+        </a>
         <div className="avatar" title={sessionEmail}>
           {sessionName.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "AD"}
         </div>
