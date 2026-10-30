@@ -131,10 +131,37 @@ function applyPdfKitAfmFix() {
  * scripts/generate-labels.ts) y devuelve el PDF listo para descargar.
  * Lo usa tanto el script npm como el botón "Generar etiquetas" del dashboard.
  */
-export async function generateLabelBatch(rawCount: number): Promise<{
+/** Estado en memoria del progreso de generación de un lote (patrón
+ *  asíncrono: el endpoint responde de inmediato y el frontend consulta
+ *  /api/labels/status/[batchId] hasta que el PDF esté listo. Esto evita
+ *  el timeout de 60 s de Vercel con lotes grandes). */
+export type BatchStatus = {
+  state: "generating" | "ready" | "error";
+  total: number;
+  created: number;
+  message?: string;
+};
+const batchProgress = new Map<string, BatchStatus>();
+
+export function getBatchStatus(batchId: string): BatchStatus | undefined {
+  return batchProgress.get(batchId);
+}
+
+export function setBatchStatus(batchId: string, status: BatchStatus): void {
+  batchProgress.set(batchId, status);
+  // Limpieza suave: conservar solo los últimos 50 lotes en memoria.
+  if (batchProgress.size > 50) {
+    const oldest = batchProgress.keys().next().value;
+    if (oldest && oldest !== batchId) batchProgress.delete(oldest);
+  }
+}
+
+/** Crea ÚNICAMENTE los registros de etiqueta del lote (rápido, ~1-3 s).
+ *  El PDF se genera aparte con generateBatchPdf() para no bloquear la
+ *  petición HTTP. */
+export async function createLabelBatch(rawCount: number): Promise<{
   batchId: string;
   labels: GeneratedLabel[];
-  pdfPath: string;
 }> {
   const count = Math.floor(Number(rawCount));
   if (!Number.isInteger(count) || count < 1 || count > 500) {
@@ -151,7 +178,56 @@ export async function generateLabelBatch(rawCount: number): Promise<{
     const record = await prisma.label.create({ data: { uid, code, batchId } });
     labels.push({ uid: record.uid, code: record.code, url: `${baseUrl}/q/${record.uid}` });
   }
+  setBatchStatus(batchId, { state: "generating", total: count, created: count });
+  return { batchId, labels };
+}
 
+/** Genera el PDF del lote a partir de las etiquetas ya creadas en la BD.
+ *  Se ejecuta en segundo plano tras la respuesta HTTP. */
+export async function generateBatchPdf(batchId: string): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (!baseUrl) {
+    setBatchStatus(batchId, { state: "error", total: 0, created: 0, message: "Falta NEXT_PUBLIC_APP_URL en el archivo .env" });
+    return;
+  }
+  try {
+    const records = await prisma.label.findMany({
+      where: { batchId },
+      orderBy: { createdAt: "asc" },
+      select: { uid: true, code: true },
+    });
+    if (!records.length) {
+      setBatchStatus(batchId, { state: "error", total: 0, created: 0, message: `No se encontraron etiquetas para el lote ${batchId}.` });
+      return;
+    }
+    const labels: GeneratedLabel[] = records.map((r) => ({ uid: r.uid, code: r.code, url: `${baseUrl}/q/${r.uid}` }));
+    const outputDir = path.resolve(process.cwd(), "output");
+    try {
+      fs.mkdirSync(outputDir, { recursive: true });
+    } catch {
+      /* en Vercel el disco es de solo lectura: igual servimos el PDF desde memoria */
+    }
+    const pdfPath = path.join(outputDir, `stickers-${batchId}-carta.pdf`);
+    await renderStickerPdf(labels, pdfPath, batchId);
+    setBatchStatus(batchId, { state: "ready", total: labels.length, created: labels.length });
+  } catch (error) {
+    console.error(`[labels] fallo generando el PDF del lote ${batchId}:`, error);
+    setBatchStatus(batchId, {
+      state: "error",
+      total: 0,
+      created: 0,
+      message: error instanceof Error ? error.message : "Error al generar el PDF.",
+    });
+  }
+}
+
+/** Compatibilidad con scripts/seed y npm run labels:generate (flujo síncrono). */
+export async function generateLabelBatch(rawCount: number): Promise<{
+  batchId: string;
+  labels: GeneratedLabel[];
+  pdfPath: string;
+}> {
+  const { batchId, labels } = await createLabelBatch(rawCount);
   const outputDir = path.resolve(process.cwd(), "output");
   try {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -160,7 +236,7 @@ export async function generateLabelBatch(rawCount: number): Promise<{
   }
   const pdfPath = path.join(outputDir, `stickers-${batchId}-carta.pdf`);
   await renderStickerPdf(labels, pdfPath, batchId);
-
+  setBatchStatus(batchId, { state: "ready", total: labels.length, created: labels.length });
   return { batchId, labels, pdfPath };
 }
 

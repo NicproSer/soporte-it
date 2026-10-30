@@ -28,6 +28,61 @@ export function GenerateLabelsButton() {
   const [count, setCount] = useState(50);
   const [status, setStatus] = useState<{ kind: "idle" | "loading" | "done" | "error"; message?: string }>({ kind: "idle" });
 
+  /** Dispara la descarga del PDF vía fetch + <a download> (con la cookie de
+   *  sesión). window.open no siempre descarga cuando el servidor responde con
+   *  Content-Disposition, y falla si el navegador bloquea la ventana. */
+  async function downloadPdf(downloadUrl: string, batchId: string) {
+    const pdfResponse = await fetch(downloadUrl);
+    if (!pdfResponse.ok) throw new Error(String(pdfResponse.status));
+    const blob = await pdfResponse.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `stickers-${batchId}-carta.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+
+  /** Polling al estado del lote hasta que el PDF esté listo (patrón asíncrono
+   *  que evita el timeout de 60 s de Vercel en producción). */
+  async function waitForPdf(statusUrl: string, downloadUrl: string, batchId: string, created: number) {
+    const started = Date.now();
+    // Espera máxima: 4 minutos (lotes grandes en serverless).
+    while (Date.now() - started < 240_000) {
+      await new Promise((r) => setTimeout(r, 1500));
+      let state = "generating";
+      try {
+        const res = await fetch(statusUrl);
+        if (res.ok) {
+          const st = await res.json();
+          state = st.state ?? "generating";
+          if (state === "error") {
+            setStatus({ kind: "error", message: st.message ?? "El PDF no se pudo generar. Revisa los logs de Vercel." });
+            return;
+          }
+        }
+      } catch {
+        continue; // fallo transitorio de red: seguimos intentando
+      }
+      if (state === "ready") {
+        try {
+          await downloadPdf(downloadUrl, batchId);
+          setStatus({ kind: "done", message: `Lote ${batchId} creado con ${created} etiquetas. El PDF se descargó automáticamente.` });
+        } catch {
+          setStatus({ kind: "done", message: `Lote ${batchId} listo, pero la descarga automática falló.` });
+          window.open(downloadUrl, "_blank", "noopener");
+        }
+        return;
+      }
+    }
+    setStatus({
+      kind: "done",
+      message: `Lote ${batchId} creado. La generación del PDF sigue en segundo plano; vuelve a intentar la descarga en unos segundos.`,
+    });
+  }
+
   async function generate() {
     setStatus({ kind: "loading" });
     try {
@@ -41,34 +96,11 @@ export function GenerateLabelsButton() {
         setStatus({ kind: "error", message: data.error ?? "No se pudieron generar las etiquetas." });
         return;
       }
-      setStatus({ kind: "done", message: `Lote ${data.batchId} creado con ${data.created} etiquetas.` });
-      // Descarga automática del PDF generado. Se obtiene vía fetch (con la
-      // cookie de sesión) y se dispara con un <a download>, porque window.open
-      // no siempre descarga cuando el servidor responde con Content-Disposition
-      // (y falla del todo si el navegador bloquea la ventana emergente).
-      try {
-        const pdfResponse = await fetch(data.downloadUrl);
-        if (!pdfResponse.ok) throw new Error(String(pdfResponse.status));
-        const blob = await pdfResponse.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `stickers-${data.batchId}-carta.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30_000);
-        setStatus({ kind: "done", message: `Lote ${data.batchId} creado con ${data.created} etiquetas. El PDF se descargó automáticamente.` });
-      } catch {
-        setStatus({
-          kind: "done",
-          message: `Lote ${data.batchId} creado, pero la descarga automática falló. `,
-        });
-        // Plan B: abrir la URL directa del PDF en una pestaña nueva.
-        window.open(data.downloadUrl, "_blank", "noopener");
-      }
+      setStatus({ kind: "loading", message: `Lote ${data.batchId}: generando PDF en segundo plano…` });
       // Actualiza las métricas del dashboard desde la base de datos.
       router.refresh();
+      // Esperar a que el PDF termine y descargarlo automáticamente.
+      void waitForPdf(data.statusUrl, data.downloadUrl, data.batchId, data.created);
     } catch {
       setStatus({ kind: "error", message: "Error de conexión al generar las etiquetas." });
     }
