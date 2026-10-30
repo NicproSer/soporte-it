@@ -14,8 +14,10 @@ build/
 
 # env files (NUNCA subir secretos)
 .env
+.env.*
 .env.local
 .env.*.local
+.env.example
 
 # logs
 npm-debug.log*
