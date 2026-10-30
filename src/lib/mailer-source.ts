@@ -275,6 +275,26 @@ export async function sendProposalToClientEmail(v: {
   await sendMail([v.customerEmail], "[Soporte IT] Te proponemos una fecha para tu visita técnica", html);
 }
 
+/** Correo al cliente cuando el equipo ACEPTA la fecha que él propuso
+ *  (flujo inverso: cliente sugirió → admin/técnico confirma). */
+export async function sendAdminAcceptedClientDateEmail(v: {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  confirmedDate: Date;
+}) {
+  const html = shell(
+    "Tu visita técnica está confirmada",
+    "Aceptamos la fecha que propusiste",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${v.customerName}</strong>, aceptamos la fecha que nos sugeriste y tu visita quedó <strong>CONFIRMADA</strong>:</p>
+     <div style="background:#e7f8d5;border:1px solid #bfe3a6;border-radius:10px;padding:14px 16px;font-size:15px;font-weight:700;color:#2e7d32;margin-bottom:10px">📅 ${formatDate(v.confirmedDate)}</div>
+     <p style="margin:0 0 10px;font-size:13px;color:#42546a;line-height:1.6">Un técnico asistirá en ese horario. Si necesitas cambiarla, responde este correo o escanea el QR de tu equipo para solicitar un ajuste.</p>
+     <div style="margin-top:18px">${btn(`${appUrl()}/visita/estado/${v.id}`, "Ver estado de mi solicitud")}</div>`,
+    `Referencia: ${v.id}`
+  );
+  await sendMail([v.customerEmail], "[Soporte IT] Visita confirmada en la fecha que propusiste", html);
+}
+
 /** Correo a los administradores cuando el cliente acepta, rechaza o sugiere otra fecha. */
 export async function sendClientResponseToAdminsEmail(v: {
   id: string;

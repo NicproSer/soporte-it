@@ -15,6 +15,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GenerateLabelsButton } from "./actions";
 import CloseTicketForm from "./close-ticket-form";
+import AcceptDateButton from "./accept-date-button";
 import { type MobileNavItem } from "./mobile-nav";
 import ProposeDateForm from "./propose-date-form";
 
@@ -166,6 +167,9 @@ export default async function DashboardPage() {
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8 }}>
+                        {visit.status === "RESCHEDULE_REQUESTED" && visit.customerSuggestedDate ? (
+                          <AcceptDateButton visitId={visit.id} suggestedDate={visit.customerSuggestedDate.toISOString()} />
+                        ) : null}
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
                         {(visit.status === "CONFIRMED" || visit.status === "PROPOSED") && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
                           <div style={{ marginTop: 8 }}>
