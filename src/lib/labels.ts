@@ -274,14 +274,22 @@ export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fi
 }
 
 /**
- * Renderiza el PDF con el MISMO diseño vectorial que scripts/render-labels.ts:
- * hoja carta, cuadrícula de 20 etiquetas (5 columnas × 4 filas), banda lateral,
- * cabecera navy, icono SVG del engranaje, QR grande con margen de silencio,
- * instrucción con acento verde, línea técnica e ID permanente.
+ * Renderiza el PDF con el MISMO diseño vectorial que scripts/render-labels.ts,
+ * PERO en el formato original: UNA etiqueta por página (50 etiquetas = 50
+ * páginas independientes), lista para recortar. Cada página usa un tamaño de
+ * papel igual al área de la etiqueta (+ margen de corte punteado), con banda
+ * lateral, cabecera navy, icono SVG del engranaje, QR grande con margen de
+ * silencio, instrucción con acento verde, línea técnica e ID permanente.
  */
 const PT = 72;
-const PAGE_W = 8.5 * PT;
-const PAGE_H = 11 * PT;
+// Tamaño de la etiqueta en puntos (diseño 410×525 escalado) + margen de corte.
+const LABEL_SCALE = 0.62; // más grande que antes: llena la página individual
+const DESIGN_W = 410;
+const DESIGN_H = 525;
+const BLEED = 14; // espacio alrededor para la línea discontinua de corte
+const PAGE_W = DESIGN_W * LABEL_SCALE + BLEED * 2;
+const PAGE_H = DESIGN_H * LABEL_SCALE + BLEED * 2;
+const PAGE_SIZE: [number, number] = [PAGE_W, PAGE_H];
 
 /** Caché del último PDF construido en memoria por renderStickerPdf(). */
 let lastPdfBuffer: Buffer[] = [];
@@ -302,7 +310,7 @@ const settingsSvg = `
 async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batchId: string) {
   applyPdfKitAfmFix();
   const doc = new PDFDocument({
-    size: "LETTER",
+    size: PAGE_SIZE,
     margin: 0,
     autoFirstPage: false,
     info: { Title: `Etiquetas Soporte IT ${batchId}`, Author: "Soporte IT" },
@@ -321,33 +329,20 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     fileWriteFailed.value = true;
   }
 
-  const columns = 5;
-  const rows = 4;
-  const perPage = columns * rows;
-  const labelScale = 0.29;
-  const designW = 410;
-  const designH = 525;
-  const cellW = PAGE_W / columns;
-  const cellH = PAGE_H / rows;
-
+  // UNA etiqueta por página (formato original del script): sin cuadrícula.
   for (let index = 0; index < labels.length; index++) {
     const label = labels[index];
-    if (index % perPage === 0) doc.addPage({ size: "LETTER", margin: 0 });
+    doc.addPage({ size: PAGE_SIZE, margin: 0 });
 
-    // Diseño vectorial escalado y centrado en una cuadrícula de 20 etiquetas por hoja carta.
-    const cellIndex = index % perPage;
-    const col = cellIndex % columns;
-    const row = Math.floor(cellIndex / columns);
-    const x = 0;
-    const y = 0;
+    // Diseño vectorial escalado y centrado en la página individual.
+    const scale = LABEL_SCALE;
+    const x = (PAGE_W - DESIGN_W * scale) / 2;
+    const y = (PAGE_H - DESIGN_H * scale) / 2;
     doc.save();
-    doc.translate(
-      col * cellW + (cellW - designW * labelScale) / 2,
-      row * cellH + (cellH - designH * labelScale) / 2,
-    );
-    doc.scale(labelScale);
-    const w = designW;
-    const h = designH;
+    doc.translate(x, y);
+    doc.scale(scale);
+    const w = DESIGN_W;
+    const h = DESIGN_H;
     const navy = "#062847";
     const blue = "#0756C8";
     const lime = "#A8E52E";
@@ -356,48 +351,48 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     // Silueta y borde de corte discontinuo.
     doc.save();
     doc.lineWidth(1.1).dash(5, { space: 4 }).strokeColor("#252525")
-      .roundedRect(x - 8, y - 8, w + 16, h + 16, 28).stroke();
+      .roundedRect(-8, -8, w + 16, h + 16, 28).stroke();
     doc.undash();
     doc.lineWidth(1).strokeColor("#555555")
-      .roundedRect(x, y, w, h, 23).stroke();
+      .roundedRect(0, 0, w, h, 23).stroke();
     // Banda tecnológica lateral y cabecera.
-    doc.roundedRect(x, y, 88, h, 22).fill(navy);
-    doc.rect(x + 65, y, 24, h).fill(navy);
-    doc.roundedRect(x, y, w, 92, 22).fill(navy);
-    doc.rect(x, y + 60, w, 32).fill(navy);
+    doc.roundedRect(0, 0, 88, h, 22).fill(navy);
+    doc.rect(65, 0, 24, h).fill(navy);
+    doc.roundedRect(0, 0, w, 92, 22).fill(navy);
+    doc.rect(0, 60, w, 32).fill(navy);
 
     // Título.
     doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(31)
-      .text("SOPORTE IT", x + 96, y + 26, { width: w - 160, align: "center" });
+      .text("SOPORTE IT", 96, 26, { width: w - 160, align: "center" });
 
     // Detalles de circuito en la banda izquierda.
     doc.lineWidth(2).strokeColor(blue);
-    doc.moveTo(x + 18, y + 24).lineTo(x + 18, y + 70).lineTo(x + 35, y + 87).lineTo(x + 65, y + 87).stroke();
+    doc.moveTo(18, 24).lineTo(18, 70).lineTo(35, 87).lineTo(65, 87).stroke();
     doc.lineWidth(1.6).strokeColor("#FFFFFF");
-    doc.circle(x + 43, y + 155, 24).stroke();
-    doc.fillColor(blue).circle(x + 43, y + 155, 14).fill();
+    doc.circle(43, 155, 24).stroke();
+    doc.fillColor(blue).circle(43, 155, 14).fill();
 
     // Icono de engranaje (SVG vectorial sobre el círculo azul).
-    SVGtoPDF(doc, settingsSvg, x + 28, y + 143, { width: 30, height: 30 });
+    SVGtoPDF(doc, settingsSvg, 28, 143, { width: 30, height: 30 });
 
     doc.lineWidth(1.5).strokeColor("#FFFFFF");
-    doc.moveTo(x + 18, y + 230).lineTo(x + 18, y + 345).lineTo(x + 48, y + 375).stroke();
+    doc.moveTo(18, 230).lineTo(18, 345).lineTo(48, 375).stroke();
     doc.lineWidth(1.5).strokeColor(blue);
-    doc.moveTo(x + 48, y + 255).lineTo(x + 70, y + 255).lineTo(x + 70, y + 285).stroke();
-    doc.circle(x + 48, y + 255, 4).stroke();
-    doc.circle(x + 70, y + 285, 4).stroke();
-    doc.fillColor(blue).circle(x + 43, y + 415, 5).fill();
-    doc.fillColor("#FFFFFF").circle(x + 43, y + 437, 5).fill();
-    doc.fillColor(lime).circle(x + 43, y + 459, 5).fill();
+    doc.moveTo(48, 255).lineTo(70, 255).lineTo(70, 285).stroke();
+    doc.circle(48, 255, 4).stroke();
+    doc.circle(70, 285, 4).stroke();
+    doc.fillColor(blue).circle(43, 415, 5).fill();
+    doc.fillColor("#FFFFFF").circle(43, 437, 5).fill();
+    doc.fillColor(lime).circle(43, 459, 5).fill();
     for (let i = 0; i < 3; i++) {
-      doc.moveTo(x + 26, y + 485 + i * 10).lineTo(x + 55, y + 458 + i * 10)
+      doc.moveTo(26, 485 + i * 10).lineTo(55, 458 + i * 10)
         .lineWidth(4).strokeColor(blue).stroke();
     }
 
     // QR grande y con margen de silencio; usa el UID ya registrado.
     const qrSize = 214;
-    const qrX = x + 133;
-    const qrY = y + 112;
+    const qrX = 133;
+    const qrY = 112;
     doc.lineWidth(5).strokeColor(blue).roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 17).stroke();
     const qr = await QRCode.toBuffer(label.url, {
       type: "png", errorCorrectionLevel: "H", margin: 3, width: 700,
@@ -406,28 +401,28 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     doc.image(qr, qrX, qrY, { width: qrSize, height: qrSize });
 
     // Instrucción con acento verde.
-    doc.fillColor(lime).circle(x + 136, y + 366, 20).fill();
+    doc.fillColor(lime).circle(136, 366, 20).fill();
     doc.lineWidth(2.5).strokeColor(navy);
-    doc.moveTo(x + 128, y + 359).lineTo(x + 128, y + 354).lineTo(x + 134, y + 354).stroke();
-    doc.moveTo(x + 138, y + 354).lineTo(x + 144, y + 354).lineTo(x + 144, y + 360).stroke();
-    doc.moveTo(x + 128, y + 372).lineTo(x + 128, y + 378).lineTo(x + 134, y + 378).stroke();
-    doc.moveTo(x + 138, y + 378).lineTo(x + 144, y + 378).lineTo(x + 144, y + 372).stroke();
+    doc.moveTo(128, 359).lineTo(128, 354).lineTo(134, 354).stroke();
+    doc.moveTo(138, 354).lineTo(144, 354).lineTo(144, 360).stroke();
+    doc.moveTo(128, 372).lineTo(128, 378).lineTo(134, 378).stroke();
+    doc.moveTo(138, 378).lineTo(144, 378).lineTo(144, 372).stroke();
     doc.fillColor(ink).font("Helvetica-Bold").fontSize(13)
-      .text("Escanea para consultar la", x + 164, y + 354, { width: 230 });
-    doc.text("información y solicitar soporte", x + 164, y + 372, { width: 230 });
+      .text("Escanea para consultar la", 164, 354, { width: 230 });
+    doc.text("información y solicitar soporte", 164, 372, { width: 230 });
 
     // Línea técnica.
-    doc.lineWidth(1.5).strokeColor(blue).moveTo(x + 112, y + 405).lineTo(x + w - 24, y + 405).stroke();
-    doc.fillColor(lime).circle(x + w - 24, y + 405, 4).fill();
+    doc.lineWidth(1.5).strokeColor(blue).moveTo(112, 405).lineTo(w - 24, 405).stroke();
+    doc.fillColor(lime).circle(w - 24, 405, 4).fill();
 
     // Identificador permanente: se conserva visible, sin campos de marca ni modelo.
     doc.fillColor(blue).font("Helvetica-Bold").fontSize(16)
-      .text(label.code, x + 105, y + 435, { width: w - 128, align: "left" });
+      .text(label.code, 105, 435, { width: w - 128, align: "left" });
     doc.fillColor("#607080").font("Helvetica").fontSize(11)
-      .text("ID permanente · " + label.uid.slice(0, 8).toUpperCase(), x + 105, y + 458, { width: w - 128 });
+      .text("ID permanente · " + label.uid.slice(0, 8).toUpperCase(), 105, 458, { width: w - 128 });
 
     // Acento inferior verde y cierre de página.
-    doc.lineWidth(2).strokeColor(lime).moveTo(x + 20, y + h - 15).lineTo(x + 90, y + h - 15).lineTo(x + 103, y + h - 28).stroke();
+    doc.lineWidth(2).strokeColor(lime).moveTo(20, h - 15).lineTo(90, h - 15).lineTo(103, h - 28).stroke();
     doc.restore();
     doc.restore();
   }

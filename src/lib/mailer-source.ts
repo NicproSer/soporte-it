@@ -55,14 +55,23 @@ function getTransporter() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    // --- FIX PARA VERCEL/PRODUCCIÓN ---
+    // Las funciones serverless de Vercel NO tienen salida IPv6. El DNS de
+    // Gmail devuelve registros AAAA y Node intenta primero IPv6 → el socket
+    // nunca conecta y el envío falla SOLO en producción (en local sí funciona
+    // porque tu red sí enruta IPv6 o resuelve antes a IPv4). Con esto se usa
+    // siempre una dirección IPv4 resuelta manualmente por nodemailer.
+    family: 4,
     // --- Anti-timeout (evita errores 504) ---
     // Si el servidor SMTP no responde a tiempo, cortamos la conexión en vez
     // de dejar la petición HTTP colgada hasta que el proxy devuelva 504.
     connectionTimeout: 8_000, // conectar en máx. 8 s
     greetingTimeout: 8_000,   // saludo SMTP en máx. 8 s
     socketTimeout: 15_000,    // inactividad del socket en máx. 15 s
-    pool: true,               // reutiliza conexiones TLS entre envíos
-    maxConnections: 2,
+    pool: false,              // en serverless cada invocación es fría: el pool
+                              // solo añade latencia y sockets huérfanos
+    maxConnections: 1,
+    minConnections: 1,
     messageRetention: 30_000,
   } as TransportOptions);
 }
@@ -159,6 +168,7 @@ export async function sendMail(to: string[], subject: string, html: string, text
       port: 587,
       secure: false,
       requireTLS: true,
+      family: 4, // mismo fix IPv4 para el reintento (Vercel no tiene IPv6)
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
       connectionTimeout: 8_000,
       greetingTimeout: 8_000,
