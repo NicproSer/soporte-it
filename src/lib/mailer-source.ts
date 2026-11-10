@@ -310,8 +310,8 @@ export async function sendAdminAcceptedClientDateEmail(v: {
 }) {
   const html = shell(
     "Tu visita técnica está confirmada",
-    "Aceptamos la fecha que propusiste",
-    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${v.customerName}</strong>, aceptamos la fecha que nos sugeriste y tu visita quedó <strong>CONFIRMADA</strong>:</p>
+    "Confirmación de fecha y horario",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${v.customerName}</strong>, el equipo de soporte confirmó tu visita técnica. La fecha y hora programadas son:</p>
      <div style="background:#e7f8d5;border:1px solid #bfe3a6;border-radius:10px;padding:14px 16px;font-size:15px;font-weight:700;color:#2e7d32;margin-bottom:10px">📅 ${formatDate(v.confirmedDate)}</div>
      <p style="margin:0 0 10px;font-size:13px;color:#42546a;line-height:1.6">Un técnico asistirá en ese horario. Si necesitas cambiarla, responde este correo o escanea el QR de tu equipo para solicitar un ajuste.</p>
      <div style="margin-top:18px">${btn(`${appUrl()}/visita/estado/${v.id}`, "Ver estado de mi solicitud")}</div>`,
