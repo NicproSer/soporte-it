@@ -1,4 +1,6 @@
 import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { z } from "zod";
