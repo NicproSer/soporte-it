@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -91,14 +93,14 @@ export async function POST(req: Request) {
     });
   }
 
-  void sendTicketClosedEmail({
+  after(() => sendTicketClosedEmail({
     id: visit.id,
     customerName: visit.customerName,
     completed,
     notes,
     closedByName: session.name,
     equipmentName: equipment?.name ?? "Sin dispositivo asociado",
-  }).catch((e) => console.error("[tickets/cerrar] no se pudo notificar el cierre:", e));
+  }).catch((e) => console.error("[tickets/cerrar] no se pudo notificar el cierre:", e)));
 
   return NextResponse.json({ ok: true, linked: linkingNow, hasEquipment: Boolean(equipment) });
 }

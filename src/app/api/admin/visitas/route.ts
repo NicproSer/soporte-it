@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import crypto from "node:crypto";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     // (causa típica de los errores 504 cuando el SMTP responde lento).
     let emailSent = false;
     let emailError: string | undefined;
-    void sendProposalToClientEmail({
+    after(() => sendProposalToClientEmail({
       id: updated.id,
       customerName: updated.customerName,
       customerEmail: updated.customerEmail,
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
         prisma.visitRequest
           .update({ where: { id: visitId }, data: { proposalEmailFailed: true } })
           .catch(() => undefined);
-      });
+      }));
     emailSent = true; // entregado al mailer en background
 
     return NextResponse.json({ ok: true, emailSent, emailError });
@@ -120,14 +122,14 @@ export async function PATCH(req: Request) {
       },
     });
 
-    void sendAdminAcceptedClientDateEmail({
+    after(() => sendAdminAcceptedClientDateEmail({
       id: updated.id,
       customerName: updated.customerName,
       customerEmail: updated.customerEmail,
       confirmedDate: updated.customerSuggestedDate!,
     })
       .then(() => console.log(`[admin/visitas] confirmación enviada a ${updated.customerEmail}`))
-      .catch((e) => console.error("[admin/visitas] error enviando confirmación:", e));
+      .catch((e) => console.error("[admin/visitas] error enviando confirmación:", e)));
 
     return NextResponse.json({ ok: true });
   } catch (e) {
