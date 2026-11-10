@@ -19,7 +19,7 @@ export default function ProposeDateForm({ visitId, status, customerName }: Props
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
   const awaitingConfirmation = status === "AWAITING_CONFIRMATION";
-  const closed = ["CONFIRMED", "COMPLETED", "CANCELLED", "AWAITING_CONFIRMATION"].includes(status);
+  const closed = ["CONFIRMED", "COMPLETED", "CANCELLED", "REJECTED", "AWAITING_CONFIRMATION"].includes(status);
 
   async function propose(e: React.FormEvent) {
     e.preventDefault();
