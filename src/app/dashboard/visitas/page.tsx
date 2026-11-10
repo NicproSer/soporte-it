@@ -61,6 +61,7 @@ export default async function VisitsManagementPage({
   const selectedStatus = STATUS.some(([value]) => value === sp.status) ? sp.status! : "";
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? "") ? sp.from! : "";
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? sp.to! : "";
+  const assigned = session.role === "ADMIN" ? (sp.assigned ?? "") : "";
   const page = Math.max(1, Math.min(1000, Number.parseInt(sp.page ?? "1", 10) || 1));
   const pageSize = 30;
 
@@ -86,8 +87,9 @@ export default async function VisitsManagementPage({
     if (to) range.lte = new Date(`${to}T23:59:59.999Z`);
     conditions.push({
       OR: [
-        { proposedDate: range },
-        { AND: [{ proposedDate: null }, { preferredDate: range }] },
+        { AND: [{ status: "RESCHEDULE_REQUESTED" }, { customerSuggestedDate: range }] },
+        { AND: [{ status: { not: "RESCHEDULE_REQUESTED" } }, { proposedDate: range }] },
+        { AND: [{ status: { not: "RESCHEDULE_REQUESTED" } }, { proposedDate: null }, { preferredDate: range }] },
       ],
     });
   }
@@ -150,7 +152,8 @@ export default async function VisitsManagementPage({
           <label>Buscar<input name="q" defaultValue={q} placeholder="Cliente, correo, dirección…" /></label>
           <label>Estado<select name="status" defaultValue={selectedStatus}><option value="">Todos los estados</option>{STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Desde<input type="date" name="from" defaultValue={from} /></label>
-          <label>Hasta<input type="date" name="to" defaultValue={to} /></label>\n          {session.role === "ADMIN" ? <label>Técnico<select name="assigned" defaultValue={assigned}><option value="">Todos los técnicos</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label> : null}\n          {session.role === "ADMIN" ? <label>Técnico<select name="assigned" defaultValue={assigned}><option value="">Todos los técnicos</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label> : null}
+          <label>Hasta<input type="date" name="to" defaultValue={to} /></label>
+          {session.role === "ADMIN" ? <label>Técnico<select name="assigned" defaultValue={assigned}><option value="">Todos los técnicos</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label> : null}
           <div className="visit-filter-buttons"><button type="submit" className="generate-button"><Filter size={15} /> Aplicar</button><Link href="/dashboard/visitas" className="btn-ghost">Limpiar</Link></div>
         </form>
       </section>
@@ -168,7 +171,8 @@ export default async function VisitsManagementPage({
             {visits.map((visit) => {
               const meta = statusMeta[visit.status] ?? { label: visit.status, tone: "gray" };
               const effectiveDate = visit.status === "RESCHEDULE_REQUESTED" ? visit.customerSuggestedDate : visit.proposedDate ?? visit.preferredDate;
-              const confirmationDate = visit.status === "AWAITING_CONFIRMATION" ? visit.proposedDate : visit.customerSuggestedDate;\n              const canConfirm = Boolean(confirmationDate) && (visit.status === "AWAITING_CONFIRMATION" || visit.status === "RESCHEDULE_REQUESTED");
+              const confirmationDate = visit.status === "AWAITING_CONFIRMATION" ? visit.proposedDate : visit.customerSuggestedDate;
+              const canConfirm = Boolean(confirmationDate) && (visit.status === "AWAITING_CONFIRMATION" || visit.status === "RESCHEDULE_REQUESTED");
               const canClose = visit.status === "CONFIRMED" && (!effectiveDate || effectiveDate <= new Date());
               const scheduledInFuture = visit.status === "CONFIRMED" && Boolean(effectiveDate && effectiveDate > new Date());
               const isClosed = ["COMPLETED", "CANCELLED", "REJECTED"].includes(visit.status);
