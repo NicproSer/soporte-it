@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendNewVisitRequestEmail, getAdminRecipients } from "@/lib/mail";
@@ -44,9 +44,9 @@ export async function POST(req: Request) {
       emailError = "MAIL_TO_ADMIN no está configurado.";
     } else {
       // La petición HTTP termina aquí; este promise sigue en background.
-      void sendNewVisitRequestEmail({ ...visit, customerPhone: visit.customerPhone })
+      after(() => sendNewVisitRequestEmail({ ...visit, customerPhone: visit.customerPhone })
         .then(() => console.log(`[visitas] correo de notificación enviado a ${recipients.length} administrador(es)`))
-        .catch((e) => console.error("[visitas] no se pudo notificar a administradores:", e));
+        .catch((e) => console.error("[visitas] no se pudo notificar a administradores:", e)));
       emailSent = true; // entregado al mailer en background
     }
 
