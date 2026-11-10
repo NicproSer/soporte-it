@@ -18,7 +18,8 @@ export default function ProposeDateForm({ visitId, status, customerName }: Props
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  const closed = ["CONFIRMED", "COMPLETED", "CANCELLED"].includes(status);
+  const awaitingConfirmation = status === "AWAITING_CONFIRMATION";
+  const closed = ["CONFIRMED", "COMPLETED", "CANCELLED", "REJECTED", "AWAITING_CONFIRMATION"].includes(status);
 
   async function propose(e: React.FormEvent) {
     e.preventDefault();
@@ -61,7 +62,7 @@ export default function ProposeDateForm({ visitId, status, customerName }: Props
           <CalendarPlus size={14} /> Proponer fecha
         </button>
       ) : null}
-      {closed ? <span className="item-sub">Solicitud cerrada.</span> : null}
+      {awaitingConfirmation ? <span className="item-sub">El cliente aceptó la fecha; falta confirmación del equipo.</span> : closed ? <span className="item-sub">Solicitud cerrada.</span> : null}
       {open ? (
         <form onSubmit={propose} className="propose-form">
           <label className="form-field" style={{ display: "block" }}>

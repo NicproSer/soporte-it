@@ -10,9 +10,7 @@ type Props = {
   suggestedDate: string; // ISO string pasado desde el server component
 };
 
-/** Botón "Aceptar fecha del cliente": deja la visita CONFIRMADA en el día que
- *  propuso el cliente y le envía la confirmación por correo. Equivale a que el
- *  admin/técnico acepte la sugerencia sin tener que volver a proponer fecha. */
+/** Confirma desde el panel la fecha que el cliente aceptó o sugirió. */
 export default function AcceptDateButton({ visitId, suggestedDate }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -22,6 +20,7 @@ export default function AcceptDateButton({ visitId, suggestedDate }: Props) {
     weekday: "short",
     day: "numeric",
     month: "short",
+    year: "numeric",
   }) +
     " " +
     new Date(suggestedDate).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -53,7 +52,7 @@ export default function AcceptDateButton({ visitId, suggestedDate }: Props) {
       {error ? <div className="generate-status error">{error}</div> : null}
       <button className="propose-button" onClick={accept} disabled={busy} style={{ background: "#2e7d32", borderColor: "#2e7d32", color: "#fff" }}>
         {busy ? <Loader2 size={14} className="spin" /> : <CalendarCheck size={14} />}
-        Aceptar fecha del cliente ({dateLabel})
+        Confirmar visita ({dateLabel})
       </button>
     </div>
   );

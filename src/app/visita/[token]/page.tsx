@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { sendClientResponseToAdminsEmail } from "@/lib/mail";
 import RespondVisitForm from "./respond-form";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Props = { params: Promise<{ token: string }> };
 
@@ -25,5 +25,5 @@ export default async function RespondVisitPage({ params }: Props) {
   const kind = visit.acceptToken === token ? "accept" : visit.rejectToken === token ? "reject" : "propose";
 
   // GET con ?accion=accept|reject ejecuta la respuesta directamente (botones simples del correo).
-  return <RespondVisitForm visitId={visit.id} kind={kind} customerName={visit.customerName} proposedDate={visit.proposedDate?.toISOString() ?? null} />;
+  return <RespondVisitForm visitId={visit.id} token={token} kind={kind} customerName={visit.customerName} proposedDate={visit.proposedDate?.toISOString() ?? null} />;
 }

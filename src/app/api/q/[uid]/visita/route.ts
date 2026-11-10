@@ -45,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     const equipment = label.equipment;
 
     // Bloquear duplicados abiertos del mismo equipo por el mismo contacto.
-    const openStatuses: VisitStatus[] = ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED", "CONFIRMED"];
+    const openStatuses: VisitStatus[] = ["PENDING", "PROPOSED", "AWAITING_CONFIRMATION", "RESCHEDULE_REQUESTED", "CONFIRMED"];
     const existingOpen = await prisma.visitRequest.findFirst({
       where: {
         equipmentId: equipment.id,

@@ -71,7 +71,7 @@ export default function MobileNav({ items, sessionName, sessionEmail, sessionRol
   // Secciones principales del bottom bar (5 + "Más").
   // Disponible en TODAS las páginas y pantallas cuando hay sesión de ADMIN/TECHNICIAN.
   const primary: BottomItem[] = [
-    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} />, match: (p) => p === "/dashboard" || (p.startsWith("/dashboard/") && !p.startsWith("/dashboard/clientes")) },
+    { href: "/dashboard", label: "Panel", icon: <Wallet size={21} />, match: (p) => p === "/dashboard" || (p.startsWith("/dashboard/") && !p.startsWith("/dashboard/clientes") && !p.startsWith("/dashboard/usuarios") && !p.startsWith("/dashboard/visitas")) },
     { href: "/scan", label: "Escanear", icon: <ScanLine size={21} /> },
     { href: "/calendario", label: "Agenda", icon: <CalendarIcon />, match: (p) => p === "/calendario" || p.startsWith("/calendario/") },
     { href: "/equipos", label: "Fichas", icon: <QrScannerIcon />, match: (p) => p === "/equipos" || p.startsWith("/equipos/") || p.startsWith("/q/") },

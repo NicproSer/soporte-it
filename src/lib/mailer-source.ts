@@ -165,10 +165,11 @@ export async function sendMail(to: string[], subject: string, html: string, text
 
   let attempts = 0;
   let lastError: unknown;
-  // Fallback 587 solo si 465 falla antes de enviar el contenido, o si el
-  // servidor rechaza explícitamente con un 4xx. No repetir resultados inciertos.
+  // Probar el segundo puerto solo ante errores recuperables previos a DATA
+  // o rechazos SMTP explícitos 4xx. Nunca repetir un resultado incierto.
   const ports: [465 | 587, 465 | 587] = [SMTP_PORT, SMTP_PORT === 465 ? 587 : 465];
-  for (const port of ports) {
+  for (let index = 0; index < ports.length; index++) {
+    const port = ports[index];
     attempts++;
     try {
       const result = await deliver(port, message);
@@ -183,7 +184,9 @@ export async function sendMail(to: string[], subject: string, html: string, text
       lastError = error;
       const details = errorDetails(error);
       console.error(`[mail] attempt ${attempts} failed port=${port} code=${details.code} command=${details.command ?? "unknown"}`);
-      if (port === 587 || !canSafelyRetry(error)) break;
+      // Si el primer puerto falla antes de DATA, probar el alternativo,
+      // independientemente de cuál esté configurado como preferido.
+      if (index === ports.length - 1 || !canSafelyRetry(error)) break;
     }
   }
 
@@ -241,6 +244,35 @@ export function formatDate(d: Date | string): string {
 }
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+/** Notifica al técnico cuando una visita se asigna o reasigna desde el panel. */
+export async function sendVisitAssignedEmail(v: {
+  id: string;
+  technicianName: string;
+  technicianEmail: string;
+  customerName: string;
+  customerEmail: string;
+  address: string;
+  issueDescription: string;
+  scheduledDate?: Date | null;
+}) {
+  const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const safe = (value: string) => value.replace(/[&<>"']/g, (char) => entities[char] ?? char);
+  const html = shell(
+    "Tienes una nueva visita asignada",
+    "Asignación de servicio técnico",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${safe(v.technicianName)}</strong>, se te ha asignado una visita técnica. Revisa los datos y coordina la atención.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+     ${row("Cliente", `${safe(v.customerName)}<br/><span style="color:#68788b;font-size:12px">${safe(v.customerEmail)}</span>`)}
+     ${row("Dirección", safe(v.address))}
+     ${row("Motivo", safe(v.issueDescription))}
+     ${v.scheduledDate ? row("Fecha", safe(formatDate(v.scheduledDate))) : row("Fecha", "Pendiente de programación")}
+     </table>
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard/visitas`, "Abrir mis visitas →")}</div>`,
+    `Solicitud: ${safe(v.id)} · Notificación automática de Soporte IT`
+  );
+  await sendMail([v.technicianEmail], `[Soporte IT] Visita asignada — ${v.customerName}`, html);
+}
 
 /** Correo a los 2 administradores cuando un cliente solicita una visita. */
 export async function sendNewVisitRequestEmail(v: {
@@ -307,14 +339,14 @@ export async function sendAdminAcceptedClientDateEmail(v: {
 }) {
   const html = shell(
     "Tu visita técnica está confirmada",
-    "Aceptamos la fecha que propusiste",
-    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${v.customerName}</strong>, aceptamos la fecha que nos sugeriste y tu visita quedó <strong>CONFIRMADA</strong>:</p>
+    "Confirmación de fecha y horario",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${v.customerName}</strong>, el equipo de soporte confirmó tu visita técnica. La fecha y hora programadas son:</p>
      <div style="background:#e7f8d5;border:1px solid #bfe3a6;border-radius:10px;padding:14px 16px;font-size:15px;font-weight:700;color:#2e7d32;margin-bottom:10px">📅 ${formatDate(v.confirmedDate)}</div>
      <p style="margin:0 0 10px;font-size:13px;color:#42546a;line-height:1.6">Un técnico asistirá en ese horario. Si necesitas cambiarla, responde este correo o escanea el QR de tu equipo para solicitar un ajuste.</p>
      <div style="margin-top:18px">${btn(`${appUrl()}/visita/estado/${v.id}`, "Ver estado de mi solicitud")}</div>`,
     `Referencia: ${v.id}`
   );
-  await sendMail([v.customerEmail], "[Soporte IT] Visita confirmada en la fecha que propusiste", html);
+  await sendMail([v.customerEmail], "[Soporte IT] Tu visita técnica está confirmada", html);
 }
 
 /** Correo a los administradores cuando el cliente acepta, rechaza o sugiere otra fecha. */
@@ -333,7 +365,7 @@ export async function sendClientResponseToAdminsEmail(v: {
     RESCHEDULE_REQUESTED: "El cliente SUGIRIÓ otra fecha",
   } as const;
   const details = {
-    ACCEPTED: "La visita quedó <strong>CONFIRMADA</strong>. Prepara la intervención.",
+    ACCEPTED: "El cliente aceptó la fecha propuesta. La visita queda <strong>PENDIENTE DE CONFIRMACIÓN INTERNA</strong> hasta que el equipo valide la disponibilidad desde el panel.",
     REJECTED: "La solicitud quedó <strong>RECHAZADA</strong>. Puedes contactarlo o cerrar el caso.",
     RESCHEDULE_REQUESTED: "Ingresa al panel para revisar la nueva fecha sugerida y volver a proponer.",
   } as const;
@@ -347,7 +379,7 @@ export async function sendClientResponseToAdminsEmail(v: {
      ${v.suggestedDate ? row("Fecha sugerida", formatDate(v.suggestedDate)) : ""}
      ${v.note ? row("Comentario", v.note) : ""}
      </table>
-     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard`, "Ver en el panel →")}</div>`,
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard#visitas`, v.action === "ACCEPTED" ? "Revisar y confirmar visita →" : "Ver en el panel →")}</div>`,
     `ID de solicitud: ${v.id}`
   );
   await sendMail(await getTeamRecipients(), `[Soporte IT] ${titles[v.action]} — ${v.customerName}`, html);

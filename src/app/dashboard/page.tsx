@@ -24,6 +24,7 @@ export const dynamic = "force-dynamic";
 const visitStatusLabels: Record<string, string> = {
   PENDING: "Pendiente",
   PROPOSED: "Fecha propuesta",
+  AWAITING_CONFIRMATION: "Aceptada por cliente · Por confirmar",
   REJECTED: "Rechazada",
   CONFIRMED: "Confirmada",
   RESCHEDULE_REQUESTED: "Reprogramación solicitada",
@@ -47,6 +48,7 @@ const labelStatusLabels: Record<string, string> = {
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "TECHNICIAN") redirect("/dashboard/visitas");
   if (session.role !== "ADMIN") redirect("/login");
 
   const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList] =
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
       prisma.label.count({ where: { status: "AVAILABLE" } }),
       prisma.label.count(),
       prisma.equipment.count(),
-      prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED"] } } }),
+      prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "AWAITING_CONFIRMATION", "RESCHEDULE_REQUESTED"] } } }),
       prisma.intervention.count(),
       prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true, acceptedBy: true, closedBy: true } }),
       // `label` es opcional (setNull): si se borran las etiquetas de la BD,
@@ -87,6 +89,7 @@ export default async function DashboardPage() {
     { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
     { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
     { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "/dashboard/visitas", icon: "▤", label: "Gestión de visitas" },
     { href: "/dashboard#historial", icon: "☷", label: "Intervenciones" },
     { href: "/dashboard/clientes", icon: "◉", label: "Clientes y dispositivos" },
   ];
@@ -138,7 +141,7 @@ export default async function DashboardPage() {
                 <h2 className="section-title">Solicitudes recientes</h2>
                 <div className="muted">Seguimiento de visitas técnicas</div>
               </div>
-              <span className="pill">{pendingVisits} pendientes</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="pill">{pendingVisits} pendientes</span><a href="/dashboard/visitas" className="btn-ghost">Gestionar todas →</a></div>
             </div>
             {recentVisits.length ? (
               <div className="list">
@@ -169,11 +172,13 @@ export default async function DashboardPage() {
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8 }}>
-                        {visit.status === "RESCHEDULE_REQUESTED" && visit.customerSuggestedDate ? (
+                        {visit.status === "AWAITING_CONFIRMATION" && visit.proposedDate ? (
+                          <AcceptDateButton visitId={visit.id} suggestedDate={visit.proposedDate.toISOString()} />
+                        ) : visit.status === "RESCHEDULE_REQUESTED" && visit.customerSuggestedDate ? (
                           <AcceptDateButton visitId={visit.id} suggestedDate={visit.customerSuggestedDate.toISOString()} />
                         ) : null}
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
-                        {(visit.status === "CONFIRMED" || visit.status === "PROPOSED") && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
+                        {visit.status === "CONFIRMED" && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
                           <div style={{ marginTop: 8 }}>
                             <CloseTicketForm visitId={visit.id} customerName={visit.customerName} needsEquipment={!visit.equipment} />
                           </div>

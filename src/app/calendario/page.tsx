@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { VisitRequest, VisitStatus } from "@prisma/client";
 
-type VisitWithEquipment = VisitRequest & { equipment: { name: string; location: string | null } | null };
+type VisitWithEquipment = VisitRequest & { equipment: { name: string; location: string | null } | null; assignedTo: { name: string } | null };
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,7 @@ const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 /** Fecha efectiva de la visita: confirmada > propuesta > preferida. */
 function effectiveDate(v: VisitRequest): Date | null {
+  if (v.status === "RESCHEDULE_REQUESTED" && v.customerSuggestedDate) return v.customerSuggestedDate;
   if (v.status === "CONFIRMED" && v.proposedDate) return v.proposedDate;
   if (v.proposedDate) return v.proposedDate;
   return v.preferredDate ?? null;
@@ -22,6 +23,7 @@ const statusMeta: Record<string, { label: string; cls: string }> = {
   PENDING: { label: "Pendiente", cls: "amber" },
   PROPOSED: { label: "Propuesta enviada", cls: "blue" },
   RESCHEDULE_REQUESTED: { label: "Cliente sugiere otra fecha", cls: "blue" },
+  AWAITING_CONFIRMATION: { label: "Aceptada · Por confirmar", cls: "violet" },
   CONFIRMED: { label: "Confirmada", cls: "green" },
   REJECTED: { label: "Rechazada", cls: "red" },
   CANCELLED: { label: "Cancelada", cls: "red" },
@@ -46,11 +48,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const visits = await prisma.visitRequest.findMany({
     where: {
       status: { notIn: ["CANCELLED"] as VisitStatus[] },
-      OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }],
+      ...(session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}),
+      OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }, { customerSuggestedDate: { not: null } }],
     },
     orderBy: { createdAt: "desc" },
     take: 500,
-    include: { equipment: { select: { name: true, location: true } } },
+    include: { equipment: { select: { name: true, location: true } }, assignedTo: { select: { name: true } } },
   });
 
   // Agrupa por día (clave YYYY-MM-DD)
@@ -171,6 +174,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         <div className="item-sub">{v.issueDescription.slice(0, 90)}{v.issueDescription.length > 90 ? "…" : ""}</div>
                         <div className="item-sub">📍 {v.address}</div>
                         {v.equipment ? <div className="item-sub">🖥 {v.equipment.name}{v.equipment.location ? ` · ${v.equipment.location}` : ""}</div> : null}
+                        <div className="item-sub">👨‍🔧 {v.assignedTo ? `Técnico: ${v.assignedTo.name}` : "Sin técnico asignado"}</div>
                       </div>
                       <div style={{ textAlign: "right", display: "grid", gap: 6, justifyItems: "end" }}>
                         <span className={`pill ${meta.cls}`}>{meta.label}</span>
