@@ -43,6 +43,9 @@ export async function POST(req: Request) {
     include: { equipment: true, acceptedBy: true },
   });
   if (!visit) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
+  if (session.role === "TECHNICIAN" && visit.assignedToId !== session.sub) {
+    return NextResponse.json({ error: "Esta visita no está asignada a tu usuario." }, { status: 403 });
+  }
   if (visit.status === "COMPLETED" || visit.status === "CANCELLED") {
     return NextResponse.json({ error: "Este ticket ya fue cerrado." }, { status: 409 });
   }
