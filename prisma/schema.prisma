@@ -55,6 +55,7 @@ model User {
   interventions Intervention[]
   acceptedVisits    VisitRequest[] @relation("AcceptedVisits")
   closedVisits      VisitRequest[] @relation("ClosedVisits")
+  assignedVisits    VisitRequest[] @relation("AssignedVisits")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -172,6 +173,9 @@ model VisitRequest {
   // true si el correo de propuesta al cliente falló (se puede reintentar desde el dashboard)
   proposalEmailFailed Boolean       @default(false)
   // Flujo tipo tickets: quién aceptó la solicitud y quién cerró la visita
+  assignedToId        String?       @db.ObjectId
+  assignedTo          User?         @relation("AssignedVisits", fields: [assignedToId], references: [id])
+  assignedAt          DateTime?
   acceptedById        String?       @db.ObjectId
   acceptedBy          User?         @relation("AcceptedVisits", fields: [acceptedById], references: [id])
   acceptedAt          DateTime?
