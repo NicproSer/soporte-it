@@ -4,6 +4,7 @@ import { sendClientResponseToAdminsEmail } from "@/lib/mail";
 import RespondVisitForm from "./respond-form";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Props = { params: Promise<{ token: string }> };
 
