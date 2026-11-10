@@ -165,8 +165,8 @@ export async function sendMail(to: string[], subject: string, html: string, text
 
   let attempts = 0;
   let lastError: unknown;
-  // Fallback 587 solo si 465 falla antes de enviar el contenido, o si el
-  // servidor rechaza explícitamente con un 4xx. No repetir resultados inciertos.
+  // Probar el segundo puerto solo ante errores recuperables previos a DATA
+  // o rechazos SMTP explícitos 4xx. Nunca repetir un resultado incierto.
   const ports: [465 | 587, 465 | 587] = [SMTP_PORT, SMTP_PORT === 465 ? 587 : 465];
   for (let index = 0; index < ports.length; index++) {
     const port = ports[index];
