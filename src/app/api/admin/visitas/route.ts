@@ -100,8 +100,13 @@ export async function PATCH(req: Request) {
 
     const visit = await prisma.visitRequest.findUnique({ where: { id: visitId } });
     if (!visit) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
-    if (!visit.customerSuggestedDate) {
-      return NextResponse.json({ error: "El cliente no ha sugerido ninguna fecha todavía." }, { status: 409 });
+    const dateToConfirm = visit.status === "AWAITING_CONFIRMATION"
+      ? visit.proposedDate
+      : visit.status === "RESCHEDULE_REQUESTED"
+        ? visit.customerSuggestedDate
+        : null;
+    if (!dateToConfirm) {
+      return NextResponse.json({ error: "No hay una fecha aceptada o sugerida pendiente de confirmar." }, { status: 409 });
     }
     if (["CONFIRMED", "COMPLETED", "CANCELLED", "REJECTED"].includes(visit.status)) {
       return NextResponse.json({ error: "Esta solicitud ya está cerrada." }, { status: 409 });
@@ -112,7 +117,7 @@ export async function PATCH(req: Request) {
       data: {
         status: "CONFIRMED",
         // La fecha del cliente pasa a ser la fecha oficial de la visita.
-        proposedDate: visit.customerSuggestedDate,
+        proposedDate: dateToConfirm,
         acceptedById: session.sub,
         acceptedAt: new Date(),
         // Los enlaces de respuesta del correo anterior dejan de ser válidos.
@@ -126,14 +131,14 @@ export async function PATCH(req: Request) {
       id: updated.id,
       customerName: updated.customerName,
       customerEmail: updated.customerEmail,
-      confirmedDate: updated.customerSuggestedDate!,
+      confirmedDate: dateToConfirm,
     })
       .then(() => console.log(`[admin/visitas] confirmación enviada a ${updated.customerEmail}`))
       .catch((e) => console.error("[admin/visitas] error enviando confirmación:", e)));
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[admin/visitas] error aceptando fecha del cliente:", e);
-    return NextResponse.json({ error: "No se pudo aceptar la fecha del cliente." }, { status: 500 });
+    console.error("[admin/visitas] error confirmando visita:", e);
+    return NextResponse.json({ error: "No se pudo confirmar la visita." }, { status: 500 });
   }
 }
