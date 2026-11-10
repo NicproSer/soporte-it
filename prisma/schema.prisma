@@ -58,6 +58,43 @@ model User {
   updatedAt     DateTime        @updatedAt
 }
 
+enum LabelBatchState {
+  GENERATING
+  READY
+  ERROR
+}
+
+enum EmailDeliveryStatus {
+  SENT
+  FAILED
+}
+
+model LabelBatch {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  batchId     String          @unique
+  total       Int
+  created     Int
+  state       LabelBatchState @default(GENERATING)
+  error       String?
+  generatedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model EmailLog {
+  id          String              @id @default(auto()) @map("_id") @db.ObjectId
+  recipients  String[]
+  subject     String
+  status      EmailDeliveryStatus
+  provider    String              @default("smtp")
+  messageId   String?
+  response    String?
+  errorCode   String?
+  error       String?
+  attempts    Int                 @default(1)
+  createdAt   DateTime            @default(now())
+}
+
 model Label {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
   uid       String      @unique
