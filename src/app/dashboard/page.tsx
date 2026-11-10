@@ -48,6 +48,7 @@ const labelStatusLabels: Record<string, string> = {
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "TECHNICIAN") redirect("/dashboard/visitas");
   if (session.role !== "ADMIN") redirect("/login");
 
   const [availableLabels, totalLabels, equipmentCount, pendingVisits, interventionCount, recentVisits, equipmentList, labelList] =
