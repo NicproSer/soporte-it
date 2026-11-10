@@ -317,7 +317,7 @@ export async function sendAdminAcceptedClientDateEmail(v: {
      <div style="margin-top:18px">${btn(`${appUrl()}/visita/estado/${v.id}`, "Ver estado de mi solicitud")}</div>`,
     `Referencia: ${v.id}`
   );
-  await sendMail([v.customerEmail], "[Soporte IT] Visita confirmada en la fecha que propusiste", html);
+  await sendMail([v.customerEmail], "[Soporte IT] Tu visita técnica está confirmada", html);
 }
 
 /** Correo a los administradores cuando el cliente acepta, rechaza o sugiere otra fecha. */
