@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { sendClientResponseToAdminsEmail } from "@/lib/mail";
 import RespondVisitForm from "./respond-form";
 
 export const dynamic = "force-dynamic";
