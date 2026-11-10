@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendClientResponseToAdminsEmail } from "@/lib/mail";
 
@@ -44,7 +45,7 @@ export async function handleAction(formData: FormData) {
   // La respuesta del cliente ya quedó guardada en la BD. El aviso a los
   // administradores se envía en segundo plano para que el navegador no
   // quede esperando a Gmail (evita errores 504 al aceptar/rechazar).
-  void sendClientResponseToAdminsEmail({
+  after(() => sendClientResponseToAdminsEmail({
     id: visit.id,
     customerName: visit.customerName,
     customerEmail: visit.customerEmail,
@@ -52,5 +53,5 @@ export async function handleAction(formData: FormData) {
     proposedDate: visit.proposedDate,
     suggestedDate,
     note: note || null,
-  }).catch((e) => console.error("[visita] no se pudo notificar a administradores:", e));
+  }).catch((e) => console.error("[visita] no se pudo notificar a administradores:", e)));
 }
