@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getBatchStatus, prismaLabelCount } from "@/lib/labels-status";
+import { prisma } from "@/lib/prisma";
 
-/**
- * Estado de generación de un lote (patrón asíncrono para evitar el timeout
- * de 60 s de Vercel): el frontend hace polling aquí hasta que state==="ready"
- * y entonces descarga /api/labels/generate/[batchId]/pdf.
- */
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ batchId: string }> },
@@ -15,13 +12,21 @@ export async function GET(
   if (!session || (session.role !== "ADMIN" && session.role !== "TECHNICIAN")) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
+
   const { batchId } = await params;
-  const status = getBatchStatus(batchId);
-  if (!status) {
-    // La instancia puede haber reiniciado: verificamos contra la base de datos.
-    const created = await prismaLabelCount(batchId);
-    if (created > 0) return NextResponse.json({ state: "ready", total: created, created });
-    return NextResponse.json({ error: `Lote ${batchId} desconocido.` }, { status: 404 });
+  if (!/^LOT-\d{8}-[A-F0-9]{6}$/i.test(batchId)) {
+    return NextResponse.json({ error: "Lote inválido." }, { status: 400 });
   }
-  return NextResponse.json(status);
+
+  const batch = await prisma.labelBatch.findUnique({ where: { batchId } });
+  if (!batch) return NextResponse.json({ error: "Lote desconocido." }, { status: 404 });
+
+  // El estado se lee siempre desde MongoDB; no se deduce que el PDF esté
+  // listo por el simple hecho de que existan registros de etiquetas.
+  return NextResponse.json({
+    state: batch.state.toLowerCase(),
+    total: batch.total,
+    created: batch.created,
+    message: batch.error ?? undefined,
+  }, { headers: { "Cache-Control": "no-store" } });
 }
