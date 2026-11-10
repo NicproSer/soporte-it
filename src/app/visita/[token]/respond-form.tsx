@@ -2,7 +2,9 @@
 
 import { useActionState } from "react";
 import { CalendarClock, CheckCircle2, Loader2, XCircle } from "lucide-react";
-import { handleAction, type VisitActionState } from "./actions";
+import { handleAction } from "./actions";
+
+type VisitActionState = { success: boolean; error?: string };
 
 type Props = {
   visitId: string;
