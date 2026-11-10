@@ -22,7 +22,7 @@ export async function getTeamRecipients(): Promise<string[]> {
   return [...new Set(emails.map((e) => e.toLowerCase().trim()).filter(Boolean))];
 }
 
-const configuredMailTimeout = Number(process.env.MAIL_TIMEOUT_MS ?? 20_000);
+const configuredMailTimeout = Number(process.env.MAIL_TIMEOUT_MS ?? 45_000);
 const MAIL_TIMEOUT_MS = Number.isFinite(configuredMailTimeout) ? Math.max(5_000, configuredMailTimeout) : 20_000;
 const SMTP_HOST = (process.env.SMTP_HOST?.trim() || "smtp.gmail.com").replace("smtp.googlemail.com", "smtp.gmail.com");
 const SMTP_USER = process.env.SMTP_USER?.trim();
@@ -74,9 +74,9 @@ function createTransport(port: 465 | 587) {
     requireTLS: port === 587,
     family: 4,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: 8_000,
-    greetingTimeout: 8_000,
-    socketTimeout: 15_000,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 50_000,
     pool: false,
   } as TransportOptions);
 }
