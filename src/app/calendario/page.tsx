@@ -46,7 +46,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   // Visitas con fecha asignada (preferida, propuesta o confirmada)
   const visits = await prisma.visitRequest.findMany({
     where: {
-      status: { notIn: ["CANCELLED"] as VisitStatus[], ...(session.role === "TECHNICIAN" ? {} : {}) },
+      status: { notIn: ["CANCELLED"] as VisitStatus[] },
+      ...(session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}),
       OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }],
     },
     orderBy: { createdAt: "desc" },
