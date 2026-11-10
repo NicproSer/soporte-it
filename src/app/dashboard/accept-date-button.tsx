@@ -20,6 +20,7 @@ export default function AcceptDateButton({ visitId, suggestedDate }: Props) {
     weekday: "short",
     day: "numeric",
     month: "short",
+    year: "numeric",
   }) +
     " " +
     new Date(suggestedDate).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
