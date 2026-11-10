@@ -11,6 +11,7 @@ const items: MobileNavItem[] = [
   { href: "/dashboard", icon: "▦", label: "Resumen" },
   { href: "/dashboard/usuarios", icon: "⚿", label: "Usuarios y accesos" },
   { href: "/dashboard/clientes", icon: "☗", label: "Clientes" },
+  { href: "/dashboard/visitas", icon: "◷", label: "Gestión de visitas" },
   { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
   { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
   { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
