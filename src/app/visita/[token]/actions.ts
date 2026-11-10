@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendClientResponseToAdminsEmail } from "@/lib/mail";
 
-export type VisitActionState = { success: boolean; error?: string };
+type VisitActionState = { success: boolean; error?: string };
 
 /** Respuesta pública validada mediante el token secreto enviado por correo. */
 export async function handleAction(formData: FormData): Promise<VisitActionState> {
