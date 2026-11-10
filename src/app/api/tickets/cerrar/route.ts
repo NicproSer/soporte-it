@@ -53,10 +53,6 @@ export async function POST(req: Request) {
   if (scheduledDate && scheduledDate.getTime() > Date.now()) {
     return NextResponse.json({ error: "La fecha programada todavía no ha llegado. No puedes cerrar la visita antes de realizarla." }, { status: 409 });
   }
-  if (visit.status === "COMPLETED" || visit.status === "CANCELLED") {
-    return NextResponse.json({ error: "Este ticket ya fue cerrado." }, { status: 409 });
-  }
-
   // Determinar el equipo del cierre: el vinculado o el que se enlazó ahora.
   let equipment = visit.equipment;
   let linkingNow = false;
@@ -75,17 +71,17 @@ export async function POST(req: Request) {
     // Evita duplicar la intervención si se reintenta una solicitud de cierre.
     const existingIntervention = await prisma.intervention.findFirst({ where: { visitRequestId: visit.id } });
     if (!existingIntervention) {
-    // Intervención enlazada al dispositivo Y al ticket → alimenta el historial.
-    await prisma.intervention.create({
-      data: {
-        equipmentId: equipment.id,
-        technicianId: session.sub,
-        visitRequestId: visit.id,
-        type: interventionType,
-        description: notes,
-        performedAt: new Date(),
-      },
-    });
+      // Intervención enlazada al dispositivo Y al ticket → alimenta el historial.
+      await prisma.intervention.create({
+        data: {
+          equipmentId: equipment.id,
+          technicianId: session.sub,
+          visitRequestId: visit.id,
+          type: interventionType,
+          description: notes,
+          performedAt: new Date(),
+        },
+      });
     }
   }
 
