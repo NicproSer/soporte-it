@@ -79,7 +79,7 @@ export default async function VisitsManagementPage({
     });
   }
   if (from || to) {
-    const range: Prisma.DateTimeFilter = {};
+    const range: { gte?: Date; lte?: Date } = {};
     if (from) range.gte = new Date(`${from}T00:00:00.000Z`);
     if (to) range.lte = new Date(`${to}T23:59:59.999Z`);
     conditions.push({
