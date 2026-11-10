@@ -13,6 +13,7 @@ const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 /** Fecha efectiva de la visita: confirmada > propuesta > preferida. */
 function effectiveDate(v: VisitRequest): Date | null {
+  if (v.status === "RESCHEDULE_REQUESTED" && v.customerSuggestedDate) return v.customerSuggestedDate;
   if (v.status === "CONFIRMED" && v.proposedDate) return v.proposedDate;
   if (v.proposedDate) return v.proposedDate;
   return v.preferredDate ?? null;
@@ -48,7 +49,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     where: {
       status: { notIn: ["CANCELLED"] as VisitStatus[] },
       ...(session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}),
-      OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }],
+      OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }, { customerSuggestedDate: { not: null } }],
     },
     orderBy: { createdAt: "desc" },
     take: 500,
