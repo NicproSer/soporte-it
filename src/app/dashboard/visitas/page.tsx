@@ -51,7 +51,7 @@ function buildQuery(params: Record<string, string>) {
 export default async function VisitsManagementPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; from?: string; to?: string; page?: string; assigned?: string }>;
 }) {
   const session = await getSession().catch(() => null);
   if (!session || !["ADMIN", "TECHNICIAN"].includes(session.role)) redirect("/login");
@@ -67,6 +67,8 @@ export default async function VisitsManagementPage({
   const conditions: Prisma.VisitRequestWhereInput[] = [];
   if (session.role === "TECHNICIAN") conditions.push({ assignedToId: session.sub });
   if (selectedStatus) conditions.push({ status: selectedStatus as VisitStatus });
+  if (assigned === "unassigned") conditions.push({ assignedToId: null });
+  else if (/^[a-f0-9]{24}$/i.test(assigned)) conditions.push({ assignedToId: assigned });
   if (q) {
     conditions.push({
       OR: [
@@ -116,7 +118,7 @@ export default async function VisitsManagementPage({
     (countByStatus.get("AWAITING_CONFIRMATION") ?? 0) +
     (countByStatus.get("RESCHEDULE_REQUESTED") ?? 0);
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const common = { q, status: selectedStatus, from, to };
+  const common = { q, status: selectedStatus, from, to, assigned };
 
   return (
     <main className="main visits-page">
@@ -148,7 +150,7 @@ export default async function VisitsManagementPage({
           <label>Buscar<input name="q" defaultValue={q} placeholder="Cliente, correo, dirección…" /></label>
           <label>Estado<select name="status" defaultValue={selectedStatus}><option value="">Todos los estados</option>{STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Desde<input type="date" name="from" defaultValue={from} /></label>
-          <label>Hasta<input type="date" name="to" defaultValue={to} /></label>
+          <label>Hasta<input type="date" name="to" defaultValue={to} /></label>\n          {session.role === "ADMIN" ? <label>Técnico<select name="assigned" defaultValue={assigned}><option value="">Todos los técnicos</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label> : null}
           <div className="visit-filter-buttons"><button type="submit" className="generate-button"><Filter size={15} /> Aplicar</button><Link href="/dashboard/visitas" className="btn-ghost">Limpiar</Link></div>
         </form>
       </section>
@@ -166,7 +168,7 @@ export default async function VisitsManagementPage({
             {visits.map((visit) => {
               const meta = statusMeta[visit.status] ?? { label: visit.status, tone: "gray" };
               const effectiveDate = visit.status === "RESCHEDULE_REQUESTED" ? visit.customerSuggestedDate : visit.proposedDate ?? visit.preferredDate;
-              const canConfirm = visit.status === "AWAITING_CONFIRMATION" || visit.status === "RESCHEDULE_REQUESTED";
+              const confirmationDate = visit.status === "AWAITING_CONFIRMATION" ? visit.proposedDate : visit.customerSuggestedDate;\n              const canConfirm = Boolean(confirmationDate) && (visit.status === "AWAITING_CONFIRMATION" || visit.status === "RESCHEDULE_REQUESTED");
               const canClose = visit.status === "CONFIRMED" && (!effectiveDate || effectiveDate <= new Date());
               const scheduledInFuture = visit.status === "CONFIRMED" && Boolean(effectiveDate && effectiveDate > new Date());
               const isClosed = ["COMPLETED", "CANCELLED", "REJECTED"].includes(visit.status);
@@ -197,7 +199,7 @@ export default async function VisitsManagementPage({
                   </div>
                   <div className="visit-management-actions">
                     {session.role === "ADMIN" ? <VisitAssignmentSelect visitId={visit.id} assignedToId={visit.assignedToId} technicians={technicians} /> : null}
-                    {canConfirm ? <AcceptDateButton visitId={visit.id} suggestedDate={(visit.status === "AWAITING_CONFIRMATION" ? visit.proposedDate : visit.customerSuggestedDate)?.toISOString() ?? ""} /> : null}
+                    {canConfirm ? <AcceptDateButton visitId={visit.id} suggestedDate={confirmationDate!.toISOString()} /> : null}
                     {session.role === "ADMIN" && !isClosed && !canClose && visit.status !== "AWAITING_CONFIRMATION" ? <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} /> : null}
                     {canClose ? <CloseTicketForm visitId={visit.id} customerName={visit.customerName} needsEquipment={!visit.equipment} /> : null}
                     {scheduledInFuture ? <span className="item-sub">Visita programada. El cierre estará disponible después de la fecha agendada.</span> : null}
