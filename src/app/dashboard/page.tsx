@@ -24,6 +24,7 @@ export const dynamic = "force-dynamic";
 const visitStatusLabels: Record<string, string> = {
   PENDING: "Pendiente",
   PROPOSED: "Fecha propuesta",
+  AWAITING_CONFIRMATION: "Aceptada por cliente · Por confirmar",
   REJECTED: "Rechazada",
   CONFIRMED: "Confirmada",
   RESCHEDULE_REQUESTED: "Reprogramación solicitada",
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
       prisma.label.count({ where: { status: "AVAILABLE" } }),
       prisma.label.count(),
       prisma.equipment.count(),
-      prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "RESCHEDULE_REQUESTED"] } } }),
+      prisma.visitRequest.count({ where: { status: { in: ["PENDING", "PROPOSED", "AWAITING_CONFIRMATION", "RESCHEDULE_REQUESTED"] } } }),
       prisma.intervention.count(),
       prisma.visitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { equipment: true, acceptedBy: true, closedBy: true } }),
       // `label` es opcional (setNull): si se borran las etiquetas de la BD,
@@ -169,7 +170,9 @@ export default async function DashboardPage() {
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8 }}>
-                        {visit.status === "RESCHEDULE_REQUESTED" && visit.customerSuggestedDate ? (
+                        {visit.status === "AWAITING_CONFIRMATION" && visit.proposedDate ? (
+                          <AcceptDateButton visitId={visit.id} suggestedDate={visit.proposedDate.toISOString()} />
+                        ) : visit.status === "RESCHEDULE_REQUESTED" && visit.customerSuggestedDate ? (
                           <AcceptDateButton visitId={visit.id} suggestedDate={visit.customerSuggestedDate.toISOString()} />
                         ) : null}
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
