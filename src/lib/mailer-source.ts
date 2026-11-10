@@ -23,7 +23,7 @@ export async function getTeamRecipients(): Promise<string[]> {
 }
 
 const configuredMailTimeout = Number(process.env.MAIL_TIMEOUT_MS ?? 45_000);
-const MAIL_TIMEOUT_MS = Number.isFinite(configuredMailTimeout) ? Math.max(5_000, configuredMailTimeout) : 20_000;
+const MAIL_TIMEOUT_MS = Number.isFinite(configuredMailTimeout) ? Math.max(5_000, configuredMailTimeout) : 45_000;
 const SMTP_HOST = (process.env.SMTP_HOST?.trim() || "smtp.gmail.com").replace("smtp.googlemail.com", "smtp.gmail.com");
 const SMTP_USER = process.env.SMTP_USER?.trim();
 const SMTP_PASS = process.env.SMTP_PASS;
