@@ -256,9 +256,8 @@ export async function sendVisitAssignedEmail(v: {
   issueDescription: string;
   scheduledDate?: Date | null;
 }) {
-  const safe = (value: string) => value.replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  })[char] ?? char);
+  const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const safe = (value: string) => value.replace(/[&<>"']/g, (char) => entities[char] ?? char);
   const html = shell(
     "Tienes una nueva visita asignada",
     "Asignación de servicio técnico",
