@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { sendVisitAssignedEmail } from "@/lib/mail";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -30,20 +31,22 @@ export async function PATCH(
   }
 
   try {
-    const visit = await prisma.visitRequest.findUnique({ where: { id }, select: { id: true, status: true } });
+    const visit = await prisma.visitRequest.findUnique({ where: { id }, select: { id: true, status: true, assignedToId: true, customerName: true, customerEmail: true, address: true, issueDescription: true, proposedDate: true, preferredDate: true } });
     if (!visit) return NextResponse.json({ error: "Visita no encontrada." }, { status: 404 });
     if (["COMPLETED", "CANCELLED", "REJECTED"].includes(visit.status)) {
       return NextResponse.json({ error: "No se puede asignar una visita cerrada." }, { status: 409 });
     }
 
+    let assignedTechnician: { id: string; name: string; email: string } | null = null;
     if (parsed.data.userId) {
       const technician = await prisma.user.findUnique({
         where: { id: parsed.data.userId },
-        select: { id: true, role: true },
+        select: { id: true, role: true, name: true, email: true },
       });
       if (!technician || technician.role !== "TECHNICIAN") {
         return NextResponse.json({ error: "La cuenta seleccionada no es un técnico activo." }, { status: 400 });
       }
+      assignedTechnician = technician;
     }
 
     await prisma.visitRequest.update({
@@ -53,6 +56,19 @@ export async function PATCH(
         assignedAt: parsed.data.userId ? new Date() : null,
       },
     });
+
+    if (assignedTechnician && assignedTechnician.id !== visit.assignedToId) {
+      after(() => sendVisitAssignedEmail({
+        id: visit.id,
+        technicianName: assignedTechnician!.name,
+        technicianEmail: assignedTechnician!.email,
+        customerName: visit.customerName,
+        customerEmail: visit.customerEmail,
+        address: visit.address,
+        issueDescription: visit.issueDescription,
+        scheduledDate: visit.proposedDate ?? visit.preferredDate,
+      }).catch((error) => console.error("[visitas/asignar] no se pudo notificar al técnico:", error)));
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
