@@ -88,6 +88,7 @@ export default async function DashboardPage() {
     { href: "/dashboard#etiquetas", icon: "▧", label: "Etiquetas QR" },
     { href: "/dashboard#equipos", icon: "▣", label: "Equipos" },
     { href: "/dashboard#visitas", icon: "◷", label: "Visitas técnicas" },
+    { href: "/dashboard/visitas", icon: "▤", label: "Gestión de visitas" },
     { href: "/dashboard#historial", icon: "☷", label: "Intervenciones" },
     { href: "/dashboard/clientes", icon: "◉", label: "Clientes y dispositivos" },
   ];
@@ -139,7 +140,7 @@ export default async function DashboardPage() {
                 <h2 className="section-title">Solicitudes recientes</h2>
                 <div className="muted">Seguimiento de visitas técnicas</div>
               </div>
-              <span className="pill">{pendingVisits} pendientes</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="pill">{pendingVisits} pendientes</span><a href="/dashboard/visitas" className="btn-ghost">Gestionar todas →</a></div>
             </div>
             {recentVisits.length ? (
               <div className="list">
