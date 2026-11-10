@@ -178,7 +178,7 @@ export default async function DashboardPage() {
                           <AcceptDateButton visitId={visit.id} suggestedDate={visit.customerSuggestedDate.toISOString()} />
                         ) : null}
                         <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} />
-                        {(visit.status === "CONFIRMED" || visit.status === "PROPOSED") && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
+                        {visit.status === "CONFIRMED" && (!visit.proposedDate || visit.proposedDate <= new Date()) ? (
                           <div style={{ marginTop: 8 }}>
                             <CloseTicketForm visitId={visit.id} customerName={visit.customerName} needsEquipment={!visit.equipment} />
                           </div>
