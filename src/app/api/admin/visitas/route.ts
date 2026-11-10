@@ -105,6 +105,9 @@ export async function PATCH(req: Request) {
       : visit.status === "RESCHEDULE_REQUESTED"
         ? visit.customerSuggestedDate
         : null;
+    if (session.role === "TECHNICIAN" && visit.assignedToId !== session.sub) {
+      return NextResponse.json({ error: "Esta visita no está asignada a tu usuario." }, { status: 403 });
+    }
     if (!dateToConfirm) {
       return NextResponse.json({ error: "No hay una fecha aceptada o sugerida pendiente de confirmar." }, { status: 409 });
     }
