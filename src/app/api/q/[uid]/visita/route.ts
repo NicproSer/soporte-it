@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { VisitStatus } from "@prisma/client";
@@ -82,9 +82,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     if (recipients.length === 0) {
       emailError = "MAIL_TO_ADMIN no está configurado.";
     } else {
-      void sendNewVisitRequestEmail({ ...visit, id: visit.id })
+      after(() => sendNewVisitRequestEmail({ ...visit, id: visit.id })
         .then(() => console.log(`[q/visita] notificación enviada a ${recipients.length} administrador(es)`))
-        .catch((e) => console.error("[q/visita] no se pudo notificar a administradores:", e));
+        .catch((e) => console.error("[q/visita] no se pudo notificar a administradores:", e)));
       emailSent = true;
     }
 
