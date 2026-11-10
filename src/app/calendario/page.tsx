@@ -22,6 +22,7 @@ const statusMeta: Record<string, { label: string; cls: string }> = {
   PENDING: { label: "Pendiente", cls: "amber" },
   PROPOSED: { label: "Propuesta enviada", cls: "blue" },
   RESCHEDULE_REQUESTED: { label: "Cliente sugiere otra fecha", cls: "blue" },
+  AWAITING_CONFIRMATION: { label: "Aceptada · Por confirmar", cls: "violet" },
   CONFIRMED: { label: "Confirmada", cls: "green" },
   REJECTED: { label: "Rechazada", cls: "red" },
   CANCELLED: { label: "Cancelada", cls: "red" },
@@ -45,7 +46,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   // Visitas con fecha asignada (preferida, propuesta o confirmada)
   const visits = await prisma.visitRequest.findMany({
     where: {
-      status: { notIn: ["CANCELLED"] as VisitStatus[] },
+      status: { notIn: ["CANCELLED"] as VisitStatus[], ...(session.role === "TECHNICIAN" ? {} : {}) },
       OR: [{ preferredDate: { not: null } }, { proposedDate: { not: null } }],
     },
     orderBy: { createdAt: "desc" },
