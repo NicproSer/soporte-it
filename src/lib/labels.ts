@@ -170,16 +170,38 @@ export async function createLabelBatch(rawCount: number): Promise<{
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!baseUrl) throw new Error("Falta NEXT_PUBLIC_APP_URL en el archivo .env");
 
+  // Fail with an actionable message if Vercel is still running a stale
+  // Prisma Client generated before LabelBatch was added to schema.prisma.
+  if (!prisma.labelBatch) {
+    throw new Error("El cliente de base de datos está desactualizado: falta LabelBatch. Ejecuta prisma generate y vuelve a desplegar.");
+  }
+
   const batchId = `LOT-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomBytes(3).toString("hex").toUpperCase()}`;
   const labels: GeneratedLabel[] = [];
-  for (let i = 0; i < count; i++) {
-    const uid = randomBytes(18).toString("base64url");
-    const code = `ST-${randomBytes(4).toString("hex").toUpperCase()}`;
-    const record = await prisma.label.create({ data: { uid, code, batchId } });
-    labels.push({ uid: record.uid, code: record.code, url: `${baseUrl}/q/${record.uid}` });
+
+  // Create the persistent batch first. If any label insert fails, remove the
+  // partial labels and batch instead of leaving orphaned records behind.
+  await prisma.labelBatch.create({
+    data: { batchId, total: count, created: 0, state: "GENERATING" },
+  });
+  try {
+    for (let i = 0; i < count; i++) {
+      const uid = randomBytes(18).toString("base64url");
+      const code = `ST-${randomBytes(4).toString("hex").toUpperCase()}`;
+      const record = await prisma.label.create({ data: { uid, code, batchId } });
+      labels.push({ uid: record.uid, code: record.code, url: `${baseUrl}/q/${record.uid}` });
+    }
+    await prisma.labelBatch.update({
+      where: { batchId },
+      data: { created: labels.length },
+    });
+  } catch (error) {
+    await prisma.label.deleteMany({ where: { batchId } }).catch(() => undefined);
+    await prisma.labelBatch.delete({ where: { batchId } }).catch(() => undefined);
+    throw error;
   }
-  await prisma.labelBatch.create({ data: { batchId, total: count, created: count, state: "GENERATING" } });
-  setBatchStatus(batchId, { state: "generating", total: count, created: count });
+
+  setBatchStatus(batchId, { state: "generating", total: count, created: labels.length });
   return { batchId, labels };
 }
 
