@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { VisitRequest, VisitStatus } from "@prisma/client";
 
-type VisitWithEquipment = VisitRequest & { equipment: { name: string; location: string | null } | null };
+type VisitWithEquipment = VisitRequest & { equipment: { name: string; location: string | null } | null; assignedTo: { name: string } | null };
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +53,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     },
     orderBy: { createdAt: "desc" },
     take: 500,
-    include: { equipment: { select: { name: true, location: true } } },
+    include: { equipment: { select: { name: true, location: true } }, assignedTo: { select: { name: true } } },
   });
 
   // Agrupa por día (clave YYYY-MM-DD)
@@ -174,6 +174,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         <div className="item-sub">{v.issueDescription.slice(0, 90)}{v.issueDescription.length > 90 ? "…" : ""}</div>
                         <div className="item-sub">📍 {v.address}</div>
                         {v.equipment ? <div className="item-sub">🖥 {v.equipment.name}{v.equipment.location ? ` · ${v.equipment.location}` : ""}</div> : null}
+                        <div className="item-sub">👨‍🔧 {v.assignedTo ? `Técnico: ${v.assignedTo.name}` : "Sin técnico asignado"}</div>
                       </div>
                       <div style={{ textAlign: "right", display: "grid", gap: 6, justifyItems: "end" }}>
                         <span className={`pill ${meta.cls}`}>{meta.label}</span>
