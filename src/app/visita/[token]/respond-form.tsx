@@ -22,7 +22,7 @@ export default function RespondVisitForm({ visitId, kind, customerName, proposed
 
   if (state) {
     const messages = {
-      accept: { title: "¡Visita confirmada! ✅", text: "La fecha propuesta quedó confirmada y el equipo de soporte fue notificado. Te enviaremos un recordatorio antes de la visita." },
+      accept: { title: "¡Fecha aceptada! ✅", text: "Registramos tu aceptación y avisamos al equipo de soporte. La visita quedará confirmada cuando nuestro equipo valide la disponibilidad. Te enviaremos un correo con la confirmación definitiva." },
       reject: { title: "Solicitud rechazada", text: " Registramos tu respuesta e informamos al administrador. Puedes crear una nueva solicitud cuando lo necesites." },
       propose: { title: "Fecha sugerida enviada 📅", text: "El administrador revisará tu propuesta y te enviará una nueva fecha por correo." },
     } as const;
@@ -65,7 +65,7 @@ export default function RespondVisitForm({ visitId, kind, customerName, proposed
             <form action={formAction}>
               <input type="hidden" name="visitId" value={visitId} />
               <input type="hidden" name="action" value="accept" />
-              <p className="muted">Confirma que la fecha propuesta te acomoda. Al aceptar, la visita quedará <strong>CONFIRMADA</strong>.</p>
+              <p className="muted">Indica que estás de acuerdo con la fecha propuesta. El equipo de soporte revisará la disponibilidad y te enviará la confirmación definitiva.</p>
               <button className="generate-button" type="submit" disabled={pending} style={{ marginTop: 18, width: "100%", justifyContent: "center", background: "#2e7d32" }}>
                 {pending ? <Loader2 size={17} className="spin" /> : <CheckCircle2 size={17} />} Confirmar esta fecha
               </button>
