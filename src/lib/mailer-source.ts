@@ -3,7 +3,7 @@ import nodemailer, { type TransportOptions } from "nodemailer";
 import type { SentMessageInfo } from "nodemailer";
 
 export function getAdminRecipients(): string[] {
-  return (process.env.MAIL_TO_ADMIN ?? "").split(/[,\\s]+/).map((e) => e.trim()).filter(Boolean);
+  return (process.env.MAIL_TO_ADMIN ?? "").split(/[,\s]+/).map((e) => e.trim()).filter(Boolean);
 }
 
 export async function getTeamRecipients(): Promise<string[]> {
@@ -32,7 +32,7 @@ function safeError(error: unknown): string {
   const e = error as { code?: string; responseCode?: number; command?: string; message?: string };
   // Nunca persistir respuestas SMTP completas: algunos servidores incluyen datos sensibles.
   return [e.code, e.responseCode ? `SMTP ${e.responseCode}` : null, e.command, e.message?.slice(0, 240)]
-    .filter(Boolean).join(" | ").replace(/(password|pass|auth)\\s*[:=]\\s*\\S+/gi, "$1=[redacted]");
+    .filter(Boolean).join(" | ").replace(/(password|pass|auth)\s*[:=]\s*\S+/gi, "$1=[redacted]");
 }
 
 async function recordEmail(input: {
