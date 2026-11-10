@@ -1,31 +1,11 @@
 import "server-only";
 import nodemailer, { type TransportOptions } from "nodemailer";
-
-/**
- * Envío de correos vía SMTP de Gmail.
- * Variables requeridas en .env:
- *   SMTP_HOST      (default smtp.gmail.com)
- *   SMTP_PORT      (default 465)
- *   SMTP_USER      correo Gmail que enviará los mensajes
- *   SMTP_PASS      contraseña de aplicación de Gmail (NO la contraseña normal)
- *   MAIL_TO_ADMIN  destino(s), separados por coma. Ej: "jefe@empresa.com,soporte@empresa.com"
- */
+import type { SentMessageInfo } from "nodemailer";
 
 export function getAdminRecipients(): string[] {
-  const raw = process.env.MAIL_TO_ADMIN ?? "";
-  return raw
-    .split(/[,\s]+/)
-    .map((e) => e.trim())
-    .filter(Boolean);
+  return (process.env.MAIL_TO_ADMIN ?? "").split(/[,\s]+/).map((e) => e.trim()).filter(Boolean);
 }
 
-/**
- * Destinatarios de las notificaciones internas (flujo tipo tickets):
- * TODOS los usuarios registrados como ADMIN o TECHNICIAN en la base de
- * datos. Si además hay correos definidos en MAIL_TO_ADMIN (legado), se
- * incluyen sin duplicar. Así, al crear un técnico/administrador desde el
- * panel, sus avisos quedan activos automáticamente sin tocar el .env.
- */
 export async function getTeamRecipients(): Promise<string[]> {
   const emails: string[] = [];
   try {
@@ -35,153 +15,182 @@ export async function getTeamRecipients(): Promise<string[]> {
       select: { email: true },
     });
     emails.push(...users.map((u) => u.email));
-  } catch (e) {
-    console.error("[mail] no se pudo leer el equipo desde la BD:", e);
+  } catch (error) {
+    console.error("[mail] team recipient lookup failed:", safeError(error));
   }
   emails.push(...getAdminRecipients());
   return [...new Set(emails.map((e) => e.toLowerCase().trim()).filter(Boolean))];
 }
 
-function getTransporter() {
-  const host = smtpHost();
-  const port = Number(process.env.SMTP_PORT ?? 465);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
-    throw new Error("Faltan SMTP_USER / SMTP_PASS en el archivo .env");
+const configuredMailTimeout = Number(process.env.MAIL_TIMEOUT_MS ?? 20_000);
+const MAIL_TIMEOUT_MS = Number.isFinite(configuredMailTimeout) ? Math.max(5_000, configuredMailTimeout) : 20_000;
+const SMTP_HOST = (process.env.SMTP_HOST?.trim() || "smtp.gmail.com").replace("smtp.googlemail.com", "smtp.gmail.com");
+const SMTP_USER = process.env.SMTP_USER?.trim();
+const SMTP_PASS = process.env.SMTP_PASS;
+
+function safeError(error: unknown): string {
+  if (!error || typeof error !== "object") return String(error);
+  const e = error as { code?: string; responseCode?: number; command?: string; message?: string };
+  // Nunca persistir respuestas SMTP completas: algunos servidores incluyen datos sensibles.
+  return [e.code, e.responseCode ? `SMTP ${e.responseCode}` : null, e.command, e.message?.slice(0, 240)]
+    .filter(Boolean).join(" | ").replace(/(password|pass|auth)\s*[:=]\s*\S+/gi, "$1=[redacted]");
+}
+
+async function recordEmail(input: {
+  recipients: string[];
+  subject: string;
+  status: "SENT" | "FAILED";
+  attempts: number;
+  messageId?: string;
+  response?: string;
+  errorCode?: string;
+  error?: string;
+}) {
+  try {
+    const { prisma } = await import("./prisma");
+    await prisma.emailLog.create({
+      data: {
+        recipients: input.recipients,
+        subject: input.subject.slice(0, 250),
+        status: input.status,
+        attempts: input.attempts,
+        messageId: input.messageId,
+        response: input.response?.slice(0, 300),
+        errorCode: input.errorCode?.slice(0, 80),
+        error: input.error?.slice(0, 500),
+      },
+    });
+  } catch (error) {
+    console.error("[mail] could not persist email log:", safeError(error));
   }
+}
+
+function createTransport(port: 465 | 587) {
+  if (!SMTP_USER || !SMTP_PASS) throw new Error("Faltan SMTP_USER / SMTP_PASS en las variables de entorno.");
   return nodemailer.createTransport({
-    host,
+    host: SMTP_HOST,
     port,
     secure: port === 465,
-    auth: { user, pass },
-    // --- FIX PARA VERCEL/PRODUCCIÓN ---
-    // Las funciones serverless de Vercel NO tienen salida IPv6. El DNS de
-    // Gmail devuelve registros AAAA y Node intenta primero IPv6 → el socket
-    // nunca conecta y el envío falla SOLO en producción (en local sí funciona
-    // porque tu red sí enruta IPv6 o resuelve antes a IPv4). Con esto se usa
-    // siempre una dirección IPv4 resuelta manualmente por nodemailer.
+    requireTLS: port === 587,
     family: 4,
-    // --- Anti-timeout (evita errores 504) ---
-    // Si el servidor SMTP no responde a tiempo, cortamos la conexión en vez
-    // de dejar la petición HTTP colgada hasta que el proxy devuelva 504.
-    connectionTimeout: 8_000, // conectar en máx. 8 s
-    greetingTimeout: 8_000,   // saludo SMTP en máx. 8 s
-    socketTimeout: 15_000,    // inactividad del socket en máx. 15 s
-    pool: false,              // en serverless cada invocación es fría: el pool
-                              // solo añade latencia y sockets huérfanos
-    maxConnections: 1,
-    minConnections: 1,
-    messageRetention: 30_000,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 15_000,
+    pool: false,
   } as TransportOptions);
 }
 
-/**
- * Envía un correo con límite de tiempo duro. Si Gmail tarda más de
- * MAIL_TIMEOUT_MS (o el puerto 465 está bloqueado y se intenta el fallback
- * 587), aborta con error claro en lugar de colgar la petición (504).
- */
-const MAIL_TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS ?? 20_000);
-
-/**
- * IMPORTA SMTP_HOST. En Vercel (producción) hay que usar `smtp.gmail.com`:
- * los hosteos de Google (`smtp.googlemail.com`) pueden resolver a IPv6, que
- * Vercel no soporta, y el envío falla silenciosamente aunque en local funcione.
- */
-function smtpHost(): string {
-  const raw = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
-  return raw === "smtp.googlemail.com" ? "smtp.gmail.com" : raw;
+function errorDetails(error: unknown) {
+  const e = error as { code?: string; responseCode?: number; command?: string; message?: string };
+  return {
+    code: e?.code ?? "SMTP_ERROR",
+    responseCode: e?.responseCode,
+    command: e?.command,
+    message: safeError(error),
+  };
 }
 
-/**
- * Diagnóstico previo: si faltan variables o el host no resuelve a ninguna IP
- * (p. ej. registros AAAI/AAAA-only en serverless), devolvemos el motivo para
- * registrarlo en los logs en vez de dejar que nodemailer falle sin contexto.
- */
-async function preflightSMTP(): Promise<string | null> {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    return "Faltan SMTP_USER / SMTP_PASS en las variables de entorno del despliegue.";
-  }
-  try {
-    const dns = await import("node:dns/promises");
-    const host = smtpHost();
-    const [v4, v6] = await Promise.all([
-      dns.resolve4(host).catch(() => [] as string[]),
-      dns.resolve6(host).catch(() => [] as string[]),
-    ]);
-    if (v4.length === 0 && v6.length === 0) {
-      return `El host ${host} no resolvió ninguna dirección IP (DNS falló). Usa SMTP_HOST=smtp.gmail.com.`;
-    }
-    if (v4.length === 0 && v6.length > 0) {
-      return `El host ${smtpHost()} solo resuelve IPv6 (${v6[0]}…). Las funciones serverless de Vercel no soportan IPv6: configura SMTP_HOST=smtp.gmail.com.`;
-    }
-  } catch (e) {
-    console.warn("[mail] preflight DNS no disponible:", e);
-  }
-  return null;
+function canSafelyRetry(error: unknown): boolean {
+  const e = error as { code?: string; responseCode?: number; command?: string };
+  // Solo fallos de conexión previos a la fase DATA o rechazo SMTP explícito 4xx.
+  // No reintentar timeouts ambiguos durante DATA: el servidor pudo aceptar el mensaje.
+  if (e?.command && /^(CONN|CONNECT|CONNECTION)$/i.test(e.command)) return true;
+  return Number(e?.responseCode) >= 400 && Number(e?.responseCode) < 500;
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+async function deliver(port: 465 | 587, message: { from: string; to: string; subject: string; html: string; text: string }): Promise<SentMessageInfo> {
+  const transporter = createTransport(port);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      promise,
+      transporter.sendMail(message),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label}: tiempo de espera agotado (${ms / 1000} s).`)), ms);
+        timer = setTimeout(() => reject(Object.assign(new Error("SMTP timeout; envío de resultado incierto, no se reintentará automáticamente."), { code: "MAIL_TIMEOUT", command: "DATA" })), MAIL_TIMEOUT_MS);
       }),
     ]);
   } finally {
     if (timer) clearTimeout(timer);
+    // Cerrar sockets incluso si se agotó el tiempo de espera.
+    transporter.close();
   }
 }
 
+/** Diagnóstico real de DNS, conexión TLS y autenticación (verify no envía correos). */
+export async function diagnoseSMTP() {
+  const checks: Array<{ stage: string; ok: boolean; detail: string }> = [];
+  if (!SMTP_USER || !SMTP_PASS) {
+    return { ok: false, checks: [{ stage: "config", ok: false, detail: "Faltan SMTP_USER o SMTP_PASS." }] };
+  }
+  checks.push({ stage: "config", ok: true, detail: `Host ${SMTP_HOST}; usuario configurado; contraseña no expuesta.` });
+  try {
+    const dns = await import("node:dns/promises");
+    const addresses = await dns.resolve4(SMTP_HOST);
+    checks.push({ stage: "dns", ok: true, detail: `DNS IPv4 correcto (${addresses.length} dirección(es)).` });
+  } catch (error) {
+    checks.push({ stage: "dns", ok: false, detail: safeError(error) });
+    return { ok: false, checks };
+  }
+
+  for (const port of [465, 587] as const) {
+    const transporter = createTransport(port);
+    try {
+      await transporter.verify();
+      checks.push({ stage: `smtp-${port}`, ok: true, detail: port === 465 ? "TLS + autenticación correctos." : "STARTTLS + autenticación correctos." });
+    } catch (error) {
+      checks.push({ stage: `smtp-${port}`, ok: false, detail: safeError(error) });
+    } finally {
+      transporter.close();
+    }
+  }
+  return { ok: checks.some((c) => c.ok && c.stage.startsWith("smtp-")), checks };
+}
+
 export async function sendMail(to: string[], subject: string, html: string, text?: string) {
-  if (to.length === 0) {
-    console.warn(`[mail] correo "${subject}" omitido: no hay destinatarios.`);
+  const recipients = [...new Set(to.map((address) => address.trim()).filter(Boolean))];
+  if (!recipients.length) {
+    console.warn(`[mail] omitted "${subject}": no recipients.`);
     return;
   }
 
-  // Diagnóstico temprano en producción (Vercel): variables faltantes o DNS
-  // IPv6-only harían fallar el envío sin dejar rastro útil en los logs.
-  const problem = await preflightSMTP();
-  if (problem) {
-    console.error(`[mail] ✖ ${subject} → ${to.join(", ")} — ${problem}`);
-    throw new Error(problem);
-  }
-
   const message = {
-    from: `"Soporte IT" <${process.env.SMTP_USER}>`,
-    to: to.join(","),
+    from: `"Soporte IT" <${SMTP_USER ?? "no-reply@example.invalid"}>`,
+    to: recipients.join(","),
     subject,
     html,
     text: text ?? stripHtml(html),
   };
 
-  try {
-    await withTimeout(getTransporter().sendMail(message), MAIL_TIMEOUT_MS, "SMTP (puerto 465)");
-    console.log(`[mail] ✔ enviado "${subject}" → ${to.join(", ")}`);
-  } catch (e) {
-    // Puerto 465 bloqueado por la red → reintento único con STARTTLS 587.
-    console.error("[mail] fallo en 465, reintentando con 587:", e);
-    const fallback = nodemailer.createTransport({
-      host: smtpHost(),
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      family: 4, // mismo fix IPv4 para el reintento (Vercel no tiene IPv6)
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      connectionTimeout: 8_000,
-      greetingTimeout: 8_000,
-      socketTimeout: 15_000,
-    } as TransportOptions);
+  let attempts = 0;
+  let lastError: unknown;
+  // Fallback 587 solo si 465 falla antes de enviar el contenido, o si el
+  // servidor rechaza explícitamente con un 4xx. No repetir resultados inciertos.
+  for (const port of [465, 587] as const) {
+    attempts++;
     try {
-      await withTimeout(fallback.sendMail(message), MAIL_TIMEOUT_MS, "SMTP (puerto 587)");
-      console.log(`[mail] ✔ enviado (587) "${subject}" → ${to.join(", ")}`);
-    } catch (err) {
-      console.error(`[mail] ✖ FALLÓ definitivamente "${subject}" → ${to.join(", ")}:`, err);
-      throw err;
+      const result = await deliver(port, message);
+      await recordEmail({
+        recipients, subject, status: "SENT", attempts,
+        messageId: result.messageId,
+        response: `SMTP ${port}: ${String(result.response ?? "accepted")}`,
+      });
+      console.info(`[mail] sent subject="${subject}" recipients=${recipients.length} port=${port} attempts=${attempts}`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const details = errorDetails(error);
+      console.error(`[mail] attempt ${attempts} failed port=${port} code=${details.code} command=${details.command ?? "unknown"}`);
+      if (port === 587 || !canSafelyRetry(error)) break;
     }
   }
+
+  const details = errorDetails(lastError);
+  await recordEmail({
+    recipients, subject, status: "FAILED", attempts,
+    errorCode: details.code,
+    error: details.message,
+  });
+  throw new Error(`No se pudo enviar el correo por SMTP: ${details.message}`);
 }
 
 function stripHtml(html: string): string {

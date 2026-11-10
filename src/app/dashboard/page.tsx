@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { GenerateLabelsButton } from "./actions";
+import { GenerateLabelsButton, SmtpAdminPanel } from "./actions";
 import CloseTicketForm from "./close-ticket-form";
 import AcceptDateButton from "./accept-date-button";
 import { type MobileNavItem } from "./mobile-nav";
@@ -128,6 +128,8 @@ export default async function DashboardPage() {
           </div>
           <GenerateLabelsButton />
         </section>
+
+        <SmtpAdminPanel />
 
         <div className="content-grid">
           <section className="card" id="visitas">

@@ -178,6 +178,7 @@ export async function createLabelBatch(rawCount: number): Promise<{
     const record = await prisma.label.create({ data: { uid, code, batchId } });
     labels.push({ uid: record.uid, code: record.code, url: `${baseUrl}/q/${record.uid}` });
   }
+  await prisma.labelBatch.create({ data: { batchId, total: count, created: count, state: "GENERATING" } });
   setBatchStatus(batchId, { state: "generating", total: count, created: count });
   return { batchId, labels };
 }
@@ -185,39 +186,20 @@ export async function createLabelBatch(rawCount: number): Promise<{
 /** Genera el PDF del lote a partir de las etiquetas ya creadas en la BD.
  *  Se ejecuta en segundo plano tras la respuesta HTTP. */
 export async function generateBatchPdf(batchId: string): Promise<void> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  if (!baseUrl) {
-    setBatchStatus(batchId, { state: "error", total: 0, created: 0, message: "Falta NEXT_PUBLIC_APP_URL en el archivo .env" });
-    return;
-  }
   try {
-    const records = await prisma.label.findMany({
+    const { buffer } = await getBatchPdf(batchId);
+    if (!buffer.length || buffer.subarray(0, 5).toString() !== "%PDF-") throw new Error("El PDF generado no tiene un encabezado válido.");
+    const batch = await prisma.labelBatch.findUnique({ where: { batchId } });
+    await prisma.labelBatch.update({
       where: { batchId },
-      orderBy: { createdAt: "asc" },
-      select: { uid: true, code: true },
+      data: { state: "READY", error: null, generatedAt: new Date() },
     });
-    if (!records.length) {
-      setBatchStatus(batchId, { state: "error", total: 0, created: 0, message: `No se encontraron etiquetas para el lote ${batchId}.` });
-      return;
-    }
-    const labels: GeneratedLabel[] = records.map((r) => ({ uid: r.uid, code: r.code, url: `${baseUrl}/q/${r.uid}` }));
-    const outputDir = path.resolve(process.cwd(), "output");
-    try {
-      fs.mkdirSync(outputDir, { recursive: true });
-    } catch {
-      /* en Vercel el disco es de solo lectura: igual servimos el PDF desde memoria */
-    }
-    const pdfPath = path.join(outputDir, `stickers-${batchId}-carta.pdf`);
-    await renderStickerPdf(labels, pdfPath, batchId);
-    setBatchStatus(batchId, { state: "ready", total: labels.length, created: labels.length });
+    setBatchStatus(batchId, { state: "ready", total: batch?.total ?? 0, created: batch?.created ?? 0 });
   } catch (error) {
-    console.error(`[labels] fallo generando el PDF del lote ${batchId}:`, error);
-    setBatchStatus(batchId, {
-      state: "error",
-      total: 0,
-      created: 0,
-      message: error instanceof Error ? error.message : "Error al generar el PDF.",
-    });
+    const message = error instanceof Error ? error.message : "Error al generar el PDF.";
+    console.error(`[labels] fallo generando el PDF del lote ${batchId}: ${message}`);
+    await prisma.labelBatch.updateMany({ where: { batchId }, data: { state: "ERROR", error: message.slice(0, 500) } });
+    setBatchStatus(batchId, { state: "error", total: 0, created: 0, message });
   }
 }
 
@@ -236,6 +218,11 @@ export async function generateLabelBatch(rawCount: number): Promise<{
   }
   const pdfPath = path.join(outputDir, `stickers-${batchId}-carta.pdf`);
   await renderStickerPdf(labels, pdfPath, batchId);
+  await prisma.labelBatch.upsert({
+    where: { batchId },
+    create: { batchId, total: labels.length, created: labels.length, state: "READY", generatedAt: new Date() },
+    update: { total: labels.length, created: labels.length, state: "READY", generatedAt: new Date(), error: null },
+  });
   setBatchStatus(batchId, { state: "ready", total: labels.length, created: labels.length });
   return { batchId, labels, pdfPath };
 }
@@ -245,14 +232,6 @@ export async function generateLabelBatch(rawCount: number): Promise<{
  *  mismo diseño de scripts/render-labels.ts. */
 export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fileName: string }> {
   const fileName = `stickers-${batchId}-carta.pdf`;
-  const filePath = path.join(path.resolve(process.cwd(), "output"), fileName);
-  try {
-    const buffer = await fs.promises.readFile(filePath);
-    if (buffer.length > 1024 && buffer.subarray(0, 5).toString() === "%PDF-") return { buffer, fileName };
-  } catch {
-    /* seguimos a la regeneración en memoria */
-  }
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!baseUrl) throw new Error("Falta NEXT_PUBLIC_APP_URL en el archivo .env");
   const records = await prisma.label.findMany({
@@ -262,15 +241,10 @@ export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fi
   });
   if (!records.length) throw new Error(`No se encontraron etiquetas para el lote ${batchId}.`);
   const labels: GeneratedLabel[] = records.map((r) => ({ uid: r.uid, code: r.code, url: `${baseUrl}/q/${r.uid}` }));
-  await renderStickerPdf(labels, filePath, batchId); // también deja el archivo en disco si es posible
-  const buffer = await fs.promises.readFile(filePath).catch(() => null);
-  if (buffer) return { buffer, fileName };
-
-  // Último recurso: renderStickerPdf ya construye el PDF EN MEMORIA; si la
-  // escritura a disco falló, lo recuperamos desde su caché interna.
-  const mem = lastPdfChunks();
-  if (!mem.length) throw new Error("No se pudo generar el PDF del lote.");
-  return { buffer: Buffer.concat(mem), fileName };
+  // MongoDB conserva las etiquetas; el PDF se reconstruye en cada invocación.
+  // Así la descarga no depende del disco efímero ni de la instancia de Vercel.
+  const buffer = await renderStickerPdf(labels, "", batchId);
+  return { buffer, fileName };
 }
 
 /**
@@ -281,21 +255,14 @@ export async function getBatchPdf(batchId: string): Promise<{ buffer: Buffer; fi
  * lateral, cabecera navy, icono SVG del engranaje, QR grande con margen de
  * silencio, instrucción con acento verde, línea técnica e ID permanente.
  */
-const PT = 72;
-// Tamaño de la etiqueta en puntos (diseño 410×525 escalado) + margen de corte.
-const LABEL_SCALE = 0.62; // más grande que antes: llena la página individual
+// Papel Carta estadounidense: 8.5 × 11 pulgadas, en puntos PDF.
+const PAGE_W = 612;
+const PAGE_H = 792;
 const DESIGN_W = 410;
 const DESIGN_H = 525;
-const BLEED = 14; // espacio alrededor para la línea discontinua de corte
-const PAGE_W = DESIGN_W * LABEL_SCALE + BLEED * 2;
-const PAGE_H = DESIGN_H * LABEL_SCALE + BLEED * 2;
+const BLEED = 28;
+const LABEL_SCALE = Math.min((PAGE_W - BLEED * 2) / DESIGN_W, (PAGE_H - BLEED * 2) / DESIGN_H);
 const PAGE_SIZE: [number, number] = [PAGE_W, PAGE_H];
-
-/** Caché del último PDF construido en memoria por renderStickerPdf(). */
-let lastPdfBuffer: Buffer[] = [];
-function lastPdfChunks(): Buffer[] {
-  return lastPdfBuffer;
-}
 
 const settingsSvg = `
 <svg xmlns="http://www.w3.org/2000/svg"
@@ -307,7 +274,7 @@ const settingsSvg = `
   </g>
 </svg>`;
 
-async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batchId: string) {
+async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batchId: string): Promise<Buffer> {
   applyPdfKitAfmFix();
   const doc = new PDFDocument({
     size: PAGE_SIZE,
@@ -315,19 +282,9 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     autoFirstPage: false,
     info: { Title: `Etiquetas Soporte IT ${batchId}`, Author: "Soporte IT" },
   });
-  // El PDF se construye EN MEMORIA: así el endpoint puede responderlo aunque
-  // el servidor no pueda escribir en disco (permisos, antivirus, Windows).
+  // El PDF se renderiza en memoria y se devuelve directamente al endpoint.
   const pdfChunks: Buffer[] = [];
-  lastPdfBuffer = pdfChunks; // expone la caché para getBatchPdf() si falla el disco
   doc.on("data", (chunk: Buffer) => pdfChunks.push(chunk));
-  const fileWriteFailed = { value: false };
-  try {
-    const output = fs.createWriteStream(filePath);
-    output.on("error", () => { fileWriteFailed.value = true; });
-    doc.pipe(output);
-  } catch {
-    fileWriteFailed.value = true;
-  }
 
   // UNA etiqueta por página (formato original del script): sin cuadrícula.
   for (let index = 0; index < labels.length; index++) {
@@ -427,9 +384,13 @@ async function renderStickerPdf(labels: GeneratedLabel[], filePath: string, batc
     doc.restore();
   }
 
+  const completed = new Promise<void>((resolve, reject) => {
+    doc.once("end", resolve);
+    doc.once("error", reject);
+  });
   doc.end();
-  await new Promise<void>((resolve) => doc.on("end", resolve));
-  if (!fileWriteFailed.value) {
-    await fs.promises.writeFile(filePath, Buffer.concat(pdfChunks)).catch(() => undefined);
-  }
+  await completed;
+  const buffer = Buffer.concat(pdfChunks);
+  if (filePath) await fs.promises.writeFile(filePath, buffer).catch(() => undefined);
+  return buffer;
 }
