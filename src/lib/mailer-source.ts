@@ -336,7 +336,7 @@ export async function sendClientResponseToAdminsEmail(v: {
     RESCHEDULE_REQUESTED: "El cliente SUGIRIÓ otra fecha",
   } as const;
   const details = {
-    ACCEPTED: "La visita quedó <strong>CONFIRMADA</strong>. Prepara la intervención.",
+    ACCEPTED: "El cliente aceptó la fecha propuesta. La visita queda <strong>PENDIENTE DE CONFIRMACIÓN INTERNA</strong> hasta que el equipo valide la disponibilidad desde el panel.",
     REJECTED: "La solicitud quedó <strong>RECHAZADA</strong>. Puedes contactarlo o cerrar el caso.",
     RESCHEDULE_REQUESTED: "Ingresa al panel para revisar la nueva fecha sugerida y volver a proponer.",
   } as const;
@@ -350,7 +350,7 @@ export async function sendClientResponseToAdminsEmail(v: {
      ${v.suggestedDate ? row("Fecha sugerida", formatDate(v.suggestedDate)) : ""}
      ${v.note ? row("Comentario", v.note) : ""}
      </table>
-     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard`, "Ver en el panel →")}</div>`,
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard#visitas`, v.action === "ACCEPTED" ? "Revisar y confirmar visita →" : "Ver en el panel →")}</div>`,
     `ID de solicitud: ${v.id}`
   );
   await sendMail(await getTeamRecipients(), `[Soporte IT] ${titles[v.action]} — ${v.customerName}`, html);
