@@ -202,7 +202,7 @@ export default async function VisitsManagementPage({
                     </div>
                   </div>
                   <div className="visit-management-actions">
-                    {session.role === "ADMIN" ? <VisitAssignmentSelect visitId={visit.id} assignedToId={visit.assignedToId} technicians={technicians} /> : null}
+                    {session.role === "ADMIN" && !isClosed ? <VisitAssignmentSelect visitId={visit.id} assignedToId={visit.assignedToId} technicians={technicians} /> : null}
                     {canConfirm ? <AcceptDateButton visitId={visit.id} suggestedDate={confirmationDate!.toISOString()} /> : null}
                     {session.role === "ADMIN" && !isClosed && !canClose && visit.status !== "AWAITING_CONFIRMATION" ? <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} /> : null}
                     {canClose ? <CloseTicketForm visitId={visit.id} customerName={visit.customerName} needsEquipment={!visit.equipment} /> : null}
