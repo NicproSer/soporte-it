@@ -245,6 +245,36 @@ export function formatDate(d: Date | string): string {
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+/** Notifica al técnico cuando una visita se asigna o reasigna desde el panel. */
+export async function sendVisitAssignedEmail(v: {
+  id: string;
+  technicianName: string;
+  technicianEmail: string;
+  customerName: string;
+  customerEmail: string;
+  address: string;
+  issueDescription: string;
+  scheduledDate?: Date | null;
+}) {
+  const safe = (value: string) => value.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char] ?? char);
+  const html = shell(
+    "Tienes una nueva visita asignada",
+    "Asignación de servicio técnico",
+    `<p style="margin:0 0 16px;font-size:14px;line-height:1.6">Hola <strong>${safe(v.technicianName)}</strong>, se te ha asignado una visita técnica. Revisa los datos y coordina la atención.</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+     ${row("Cliente", `${safe(v.customerName)}<br/><span style="color:#68788b;font-size:12px">${safe(v.customerEmail)}</span>`)}
+     ${row("Dirección", safe(v.address))}
+     ${row("Motivo", safe(v.issueDescription))}
+     ${v.scheduledDate ? row("Fecha", safe(formatDate(v.scheduledDate))) : row("Fecha", "Pendiente de programación")}
+     </table>
+     <div style="margin-top:22px">${btn(`${appUrl()}/dashboard/visitas`, "Abrir mis visitas →")}</div>`,
+    `Solicitud: ${safe(v.id)} · Notificación automática de Soporte IT`
+  );
+  await sendMail([v.technicianEmail], `[Soporte IT] Visita asignada — ${v.customerName}`, html);
+}
+
 /** Correo a los 2 administradores cuando un cliente solicita una visita. */
 export async function sendNewVisitRequestEmail(v: {
   id: string;
