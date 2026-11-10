@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { z } from "zod";
@@ -65,9 +65,9 @@ export async function POST(req: Request) {
 
   // El usuario ya quedó creado; el correo de bienvenida va en segundo plano
   // para no bloquear la petición (evita 504 si Gmail responde lento).
-  void sendWelcomeEmail({ name, email, role, tempPassword }).catch((e) =>
+  after(() => sendWelcomeEmail({ name, email, role, tempPassword }).catch((e) =>
     console.error("[usuarios] no se pudo enviar el correo de bienvenida:", e)
-  );
+  ));
 
   return NextResponse.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 }
@@ -130,13 +130,13 @@ export async function PUT(req: Request) {
 
     // Aviso por correo al usuario cuya cuenta fue modificada (no bloquea la respuesta).
     if (data.email) {
-      void sendMail(
+      after(() => sendMail(
         [updated.email],
         "Tu cuenta de Soporte IT fue actualizada",
         `<p>Hola ${updated.name}, un administrador actualizó los datos de tu cuenta.</p>` +
           `<p>Tu nuevo correo de acceso es <strong>${updated.email}</strong> (la contraseña no cambió).</p>`,
         `Tu cuenta de Soporte IT ahora usa el correo ${updated.email}.`
-      ).catch((e) => console.error("[usuarios] aviso de edición no enviado:", e));
+      ).catch((e) => console.error("[usuarios] aviso de edición no enviado:", e)));
     }
 
     return NextResponse.json({ ok: true, user: updated });
@@ -165,9 +165,9 @@ export async function PUT(req: Request) {
     data: { resetTokenHash: hashToken(rawToken), resetTokenExpiresAt: new Date(Date.now() + 2 * 3600 * 1000) },
   });
 
-  void sendPasswordResetEmail({ name: user.name, email: user.email, token: rawToken }).catch((e) =>
+  after(() => sendPasswordResetEmail({ name: user.name, email: user.email, token: rawToken }).catch((e) =>
     console.error("[usuarios] no se pudo enviar el correo de recuperación:", e)
-  );
+  ));
 
   return NextResponse.json({ ok: true });
 }
