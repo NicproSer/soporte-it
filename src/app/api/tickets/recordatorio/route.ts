@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -21,14 +21,14 @@ export async function PUT(req: Request) {
   });
   if (!visit) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
 
-  void sendVisitReminderEmail({
+  after(() => sendVisitReminderEmail({
     id: visit.id,
     customerName: visit.customerName,
     address: visit.address,
     proposedDate: visit.proposedDate,
     acceptedByName: visit.acceptedBy?.name ?? null,
     equipmentName: visit.equipment?.name ?? null,
-  }).catch((e) => console.error("[tickets/recordatorio] fallo:", e));
+  }).catch((e) => console.error("[tickets/recordatorio] fallo:", e)));
 
   return NextResponse.json({ ok: true });
 }
