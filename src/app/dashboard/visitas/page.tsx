@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarDays, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Filter, MapPin, UserRound, Wrench } from "lucide-react";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, VisitStatus } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import AcceptDateButton from "../accept-date-button";
@@ -66,7 +66,7 @@ export default async function VisitsManagementPage({
 
   const conditions: Prisma.VisitRequestWhereInput[] = [];
   if (session.role === "TECHNICIAN") conditions.push({ assignedToId: session.sub });
-  if (selectedStatus) conditions.push({ status: selectedStatus as Prisma.EnumVisitStatusFilter["equals"] });
+  if (selectedStatus) conditions.push({ status: selectedStatus as VisitStatus });
   if (q) {
     conditions.push({
       OR: [
@@ -100,6 +100,7 @@ export default async function VisitsManagementPage({
       include: {
         equipment: { select: { name: true, location: true } },
         assignedTo: { select: { id: true, name: true, email: true } },
+        acceptedBy: { select: { id: true, name: true } },
       },
     }),
     prisma.visitRequest.count({ where }),
