@@ -1,4 +1,6 @@
 import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendNewVisitRequestEmail, getAdminRecipients } from "@/lib/mail";
