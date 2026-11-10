@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import crypto from "node:crypto";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
     });
 
     // Correo al cliente EN SEGUNDO PLANO (evita 504 cuando Gmail va lento).
-    void sendProposalToClientEmail({
+    after(() => sendProposalToClientEmail({
       id: updated.id,
       customerName: updated.customerName,
       customerEmail: updated.customerEmail,
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
         prisma.visitRequest
           .update({ where: { id: visitId }, data: { proposalEmailFailed: true } })
           .catch(() => undefined);
-      });
+      }));
 
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -101,14 +103,14 @@ export async function PUT(req: Request) {
   });
   if (!visit) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
 
-  void sendVisitReminderEmail({
+  after(() => sendVisitReminderEmail({
     id: visit.id,
     customerName: visit.customerName,
     address: visit.address,
     proposedDate: visit.proposedDate,
     acceptedByName: visit.acceptedBy?.name ?? null,
     equipmentName: visit.equipment?.name ?? null,
-  }).catch((e) => console.error("[tickets] no se pudo reenviar el recordatorio:", e));
+  }).catch((e) => console.error("[tickets] no se pudo reenviar el recordatorio:", e)));
 
   return NextResponse.json({ ok: true });
 }
