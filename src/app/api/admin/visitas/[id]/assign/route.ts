@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const schema = z.object({
   userId: z.string().regex(/^[a-f0-9]{24}$/i).nullable(),
