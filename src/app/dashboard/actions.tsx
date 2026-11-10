@@ -27,6 +27,7 @@ export function GenerateLabelsButton() {
   const router = useRouter();
   const [count, setCount] = useState(50);
   const [status, setStatus] = useState<{ kind: "idle" | "loading" | "done" | "error"; message?: string }>({ kind: "idle" });
+  const [downloadLink, setDownloadLink] = useState<string | null>(null);
 
   /** Dispara la descarga del PDF vía fetch + <a download> (con la cookie de
    *  sesión). window.open no siempre descarga cuando el servidor responde con
@@ -85,6 +86,7 @@ export function GenerateLabelsButton() {
 
   async function generate() {
     setStatus({ kind: "loading" });
+    setDownloadLink(null);
     try {
       const response = await fetch("/api/labels/generate", {
         method: "POST",
@@ -96,6 +98,7 @@ export function GenerateLabelsButton() {
         setStatus({ kind: "error", message: data.error ?? "No se pudieron generar las etiquetas." });
         return;
       }
+      setDownloadLink(data.downloadUrl);
       setStatus({ kind: "loading", message: `Lote ${data.batchId}: generando PDF en segundo plano…` });
       // Actualiza las métricas del dashboard desde la base de datos.
       router.refresh();
@@ -129,7 +132,16 @@ export function GenerateLabelsButton() {
         </button>
       </div>
       {status.message ? (
-        <div className={`generate-status ${status.kind}`}>{status.message}</div>
+        <div className={`generate-status ${status.kind}`}>
+          {status.message}
+          {downloadLink && status.kind !== "loading" ? (
+            <div style={{ marginTop: 8 }}>
+              <a href={downloadLink} style={{ color: "#1456c0", fontWeight: 700 }} download>
+                Descargar PDF nuevamente
+              </a>
+            </div>
+          ) : null}
+        </div>
       ) : (
         <div className="generate-hint">
           Crea los QR en la base de datos y descarga el PDF listo para imprimir. Ya no necesitas escribir comandos npm.
