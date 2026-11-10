@@ -17,10 +17,10 @@ export async function handleAction(formData: FormData) {
   // Evita re-procesar respuestas de enlaces ya usados/cerrados.
   if (["CONFIRMED", "COMPLETED", "CANCELLED"].includes(visit.status)) return;
 
-  let nextStatus: "CONFIRMED" | "REJECTED" | "RESCHEDULE_REQUESTED";
+  let nextStatus: "AWAITING_CONFIRMATION" | "REJECTED" | "RESCHEDULE_REQUESTED";
   let suggestedDate: Date | null = null;
 
-  if (action === "accept") nextStatus = "CONFIRMED";
+  if (action === "accept") nextStatus = "AWAITING_CONFIRMATION";
   else if (action === "reject") nextStatus = "REJECTED";
   else if (action === "propose") {
     if (!dateRaw) return;
@@ -48,7 +48,7 @@ export async function handleAction(formData: FormData) {
     id: visit.id,
     customerName: visit.customerName,
     customerEmail: visit.customerEmail,
-    action: nextStatus === "CONFIRMED" ? "ACCEPTED" : nextStatus,
+    action: nextStatus === "AWAITING_CONFIRMATION" ? "ACCEPTED" : nextStatus,
     proposedDate: visit.proposedDate,
     suggestedDate,
     note: note || null,
