@@ -25,6 +25,8 @@ export async function getTeamRecipients(): Promise<string[]> {
 const configuredMailTimeout = Number(process.env.MAIL_TIMEOUT_MS ?? 45_000);
 const MAIL_TIMEOUT_MS = Number.isFinite(configuredMailTimeout) ? Math.max(5_000, configuredMailTimeout) : 45_000;
 const SMTP_HOST = (process.env.SMTP_HOST?.trim() || "smtp.gmail.com").replace("smtp.googlemail.com", "smtp.gmail.com");
+// Puerto preferido para el envío real. Permite probar 587 sin cambiar el código.
+const SMTP_PORT: 465 | 587 = process.env.SMTP_PORT?.trim() === "587" ? 587 : 465;
 const SMTP_USER = process.env.SMTP_USER?.trim();
 const SMTP_PASS = process.env.SMTP_PASS;
 
@@ -165,7 +167,8 @@ export async function sendMail(to: string[], subject: string, html: string, text
   let lastError: unknown;
   // Fallback 587 solo si 465 falla antes de enviar el contenido, o si el
   // servidor rechaza explícitamente con un 4xx. No repetir resultados inciertos.
-  for (const port of [465, 587] as const) {
+  const ports: [465 | 587, 465 | 587] = [SMTP_PORT, SMTP_PORT === 465 ? 587 : 465];
+  for (const port of ports) {
     attempts++;
     try {
       const result = await deliver(port, message);
