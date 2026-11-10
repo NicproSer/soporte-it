@@ -115,8 +115,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Esta solicitud ya está cerrada." }, { status: 409 });
     }
 
-    const updated = await prisma.visitRequest.update({
-      where: { id: visitId },
+    const claimed = await prisma.visitRequest.updateMany({
+      where: {
+        id: visitId,
+        status: visit.status,
+        ...(session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}),
+      },
       data: {
         status: "CONFIRMED",
         // La fecha del cliente pasa a ser la fecha oficial de la visita.
@@ -129,11 +133,14 @@ export async function PATCH(req: Request) {
         proposeToken: null,
       },
     });
+    if (claimed.count !== 1) {
+      return NextResponse.json({ error: "La visita ya fue modificada o confirmada por otro usuario. Actualiza el panel." }, { status: 409 });
+    }
 
     after(() => sendAdminAcceptedClientDateEmail({
-      id: updated.id,
-      customerName: updated.customerName,
-      customerEmail: updated.customerEmail,
+      id: visit.id,
+      customerName: visit.customerName,
+      customerEmail: visit.customerEmail,
       confirmedDate: dateToConfirm,
     })
       .then(() => console.log(`[admin/visitas] confirmación enviada a ${updated.customerEmail}`))
