@@ -165,9 +165,10 @@ export default async function VisitsManagementPage({
           <div className="visit-list">
             {visits.map((visit) => {
               const meta = statusMeta[visit.status] ?? { label: visit.status, tone: "gray" };
-              const effectiveDate = visit.proposedDate ?? visit.customerSuggestedDate ?? visit.preferredDate;
+              const effectiveDate = visit.status === "RESCHEDULE_REQUESTED" ? visit.customerSuggestedDate : visit.proposedDate ?? visit.preferredDate;
               const canConfirm = visit.status === "AWAITING_CONFIRMATION" || visit.status === "RESCHEDULE_REQUESTED";
-              const canClose = visit.status === "CONFIRMED";
+              const canClose = visit.status === "CONFIRMED" && (!effectiveDate || effectiveDate <= new Date());
+              const scheduledInFuture = visit.status === "CONFIRMED" && Boolean(effectiveDate && effectiveDate > new Date());
               const isClosed = ["COMPLETED", "CANCELLED", "REJECTED"].includes(visit.status);
               return (
                 <article className="visit-management-card" key={visit.id}>
@@ -197,8 +198,9 @@ export default async function VisitsManagementPage({
                   <div className="visit-management-actions">
                     {session.role === "ADMIN" ? <VisitAssignmentSelect visitId={visit.id} assignedToId={visit.assignedToId} technicians={technicians} /> : null}
                     {canConfirm ? <AcceptDateButton visitId={visit.id} suggestedDate={(visit.status === "AWAITING_CONFIRMATION" ? visit.proposedDate : visit.customerSuggestedDate)?.toISOString() ?? ""} /> : null}
-                    {!isClosed && !canClose && visit.status !== "AWAITING_CONFIRMATION" ? <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} /> : null}
+                    {session.role === "ADMIN" && !isClosed && !canClose && visit.status !== "AWAITING_CONFIRMATION" ? <ProposeDateForm visitId={visit.id} status={visit.status} customerName={visit.customerName} /> : null}
                     {canClose ? <CloseTicketForm visitId={visit.id} customerName={visit.customerName} needsEquipment={!visit.equipment} /> : null}
+                    {scheduledInFuture ? <span className="item-sub">Visita programada. El cierre estará disponible después de la fecha agendada.</span> : null}
                     {isClosed ? <span className="item-sub">Esta solicitud está cerrada.</span> : null}
                     {visit.status === "CONFIRMED" ? <a className="btn-ghost small" href={`/api/visitas/${visit.id}/calendar`} download>Añadir al calendario (.ics)</a> : null}
                   </div>
