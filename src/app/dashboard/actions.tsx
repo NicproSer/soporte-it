@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, LogOut, QrCode, Tags } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, LogOut, Mail, QrCode, RefreshCw, Tags } from "lucide-react";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -136,5 +136,105 @@ export function GenerateLabelsButton() {
         </div>
       )}
     </div>
+  );
+}
+
+
+type SmtpCheck = { stage: string; ok: boolean; detail: string };
+type EmailLog = {
+  id: string;
+  recipients: string[];
+  subject: string;
+  status: "SENT" | "FAILED";
+  attempts: number;
+  error?: string | null;
+  createdAt: string;
+};
+
+export function SmtpAdminPanel() {
+  const [checks, setChecks] = useState<SmtpCheck[] | null>(null);
+  const [logs, setLogs] = useState<EmailLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadLogs() {
+    try {
+      const response = await fetch("/api/admin/email/logs?limit=6", { cache: "no-store" });
+      if (!response.ok) throw new Error("No se pudo consultar el historial de correos.");
+      const data = await response.json();
+      setLogs(data.logs ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al consultar el historial.");
+    }
+  }
+
+  async function diagnose() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/email/diagnose", { method: "POST" });
+      const data = await response.json();
+      setChecks(data.checks ?? []);
+      if (!response.ok && !data.checks) throw new Error(data.error ?? "El diagnóstico SMTP falló.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo ejecutar el diagnóstico SMTP.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadLogs();
+  }, []);
+
+  return (
+    <section className="card" id="correo" style={{ marginBottom: 18 }}>
+      <div className="section-head">
+        <div>
+          <h2 className="section-title">Correo y SMTP</h2>
+          <div className="muted">Comprueba DNS, conexión TLS/STARTTLS y autenticación. El diagnóstico no envía mensajes.</div>
+        </div>
+        <Mail size={20} color="#1456c0" />
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <button className="generate-button" onClick={diagnose} disabled={loading}>
+          {loading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+          {loading ? "Comprobando SMTP…" : "Diagnosticar SMTP"}
+        </button>
+        <button className="generate-button" onClick={() => void loadLogs()} disabled={loading} style={{ background: "#eef3fb", color: "#1456c0" }}>
+          Actualizar historial
+        </button>
+      </div>
+      {error ? <div className="generate-status error">{error}</div> : null}
+      {checks ? (
+        <div className="list" style={{ marginBottom: 16 }}>
+          {checks.map((check) => (
+            <div className="list-item" key={check.stage} style={{ alignItems: "flex-start", gap: 10 }}>
+              {check.ok ? <CheckCircle2 size={17} color="#21834a" /> : <AlertTriangle size={17} color="#b3261e" />}
+              <div style={{ minWidth: 0 }}>
+                <div className="item-title">{check.stage.toUpperCase()}</div>
+                <div className="item-sub">{check.detail}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="item-title" style={{ marginBottom: 8 }}>Últimos correos registrados</div>
+      {logs.length ? (
+        <div className="list">
+          {logs.map((log) => (
+            <div className="list-item" key={log.id} style={{ alignItems: "flex-start", gap: 10 }}>
+              {log.status === "SENT" ? <CheckCircle2 size={16} color="#21834a" /> : <AlertTriangle size={16} color="#b3261e" />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="item-title">{log.subject}</div>
+                <div className="item-sub">{log.recipients.join(", ")} · {new Date(log.createdAt).toLocaleString("es-ES")} · {log.attempts} intento(s)</div>
+                {log.error ? <div className="item-sub" style={{ color: "#b3261e" }}>{log.error}</div> : null}
+              </div>
+              <span className={`pill ${log.status === "SENT" ? "green" : "red"}`}>{log.status === "SENT" ? "Enviado" : "Fallido"}</span>
+            </div>
+          ))}
+        </div>
+      ) : <div className="empty">Todavía no hay envíos registrados.</div>}
+    </section>
   );
 }
