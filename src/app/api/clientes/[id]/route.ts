@@ -24,13 +24,12 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (session?.role !== "ADMIN") return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const { id } = await params;
   try {
-    const [equipmentCount, customer] = await Promise.all([
-      prisma.equipment.count({ where: { customerId: id } }),
-      prisma.customer.findUnique({ where: { id }, include: { branches: { include: { sites: true } } } }),
-    ]);
+    const customer = await prisma.customer.findUnique({ where: { id }, include: { branches: { include: { sites: true } } } });
     if (!customer) return NextResponse.json({ error: "El cliente no existe." }, { status: 404 });
-    if (equipmentCount > 0) return NextResponse.json({ error: "No se puede eliminar este cliente porque tiene equipos asociados. Reasigna esos equipos primero." }, { status: 409 });
     const branchIds = customer.branches.map((branch) => branch.id);
+    const siteIds = customer.branches.flatMap((branch) => branch.sites.map((site) => site.id));
+    const equipmentCount = await prisma.equipment.count({ where: { OR: [{ customerId: id }, ...(branchIds.length ? [{ branchId: { in: branchIds } }] : []), ...(siteIds.length ? [{ siteId: { in: siteIds } }] : [])] } });
+    if (equipmentCount > 0) return NextResponse.json({ error: "No se puede eliminar este cliente porque tiene equipos asociados. Reasigna esos equipos primero." }, { status: 409 });
     await prisma.site.deleteMany({ where: { branchId: { in: branchIds } } });
     await prisma.branch.deleteMany({ where: { customerId: id } });
     await prisma.customer.delete({ where: { id } });
