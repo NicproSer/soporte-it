@@ -164,10 +164,10 @@ model VisitRequest {
   status              VisitStatus @default(PENDING)
   responseTokenHash   String?
   tokenExpiresAt      DateTime?
-  // Tokens para el flujo de respuesta del cliente (aceptar / rechazar / proponer otra fecha)
-  acceptToken         String?     @unique
-  rejectToken         String?     @unique
-  proposeToken        String?     @unique
+  // Tokens aleatorios de respuesta. Sin índices únicos: MongoDB puede colisionar con valores null/missing en índices unique.
+  acceptToken         String?
+  rejectToken         String?
+  proposeToken        String?
   customerSuggestedDate DateTime?
   customerNote        String?
   // true si el correo de propuesta al cliente falló (se puede reintentar desde el dashboard)
