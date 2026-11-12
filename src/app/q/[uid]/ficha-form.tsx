@@ -20,6 +20,9 @@ type Props = {
     ownerName?: string;
     ownerEmail?: string;
     ownerPhone?: string;
+    customerId?: string;
+    branchId?: string;
+    siteId?: string;
   };
 };
 
@@ -33,9 +36,9 @@ export default function FichaForm({ uid, initial }: Props) {
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
-  const [customerId, setCustomerId] = useState("");
-  const [branchId, setBranchId] = useState("");
-  const [siteId, setSiteId] = useState("");
+  const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
+  const [branchId, setBranchId] = useState(initial?.branchId ?? "");
+  const [siteId, setSiteId] = useState(initial?.siteId ?? "");
   useEffect(() => { fetch("/api/clientes").then(r => r.ok ? r.json() : null).then(d => { if (d?.clientes) setCustomers(d.clientes); }).catch(() => undefined); }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
