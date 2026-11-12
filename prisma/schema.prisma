@@ -127,10 +127,56 @@ model Equipment {
   ownerName      String?
   ownerEmail     String?
   ownerPhone     String?
+  customerId     String?          @db.ObjectId
+  customer       Customer?        @relation(fields: [customerId], references: [id])
+  branchId       String?          @db.ObjectId
+  branch         Branch?          @relation(fields: [branchId], references: [id])
+  siteId         String?          @db.ObjectId
+  site           Site?            @relation(fields: [siteId], references: [id])
   interventions  Intervention[]
   visits         VisitRequest[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+}
+
+
+model Customer {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  email       String
+  phone       String?
+  branches    Branch[]
+  equipment   Equipment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Branch {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  customerId   String   @db.ObjectId
+  customer     Customer @relation(fields: [customerId], references: [id])
+  name         String
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  sites        Site[]
+  equipment    Equipment[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Site {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  branchId    String   @db.ObjectId
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  name        String
+  address     String
+  latitude    Float?
+  longitude   Float?
+  directions  String?
+  equipment   Equipment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Intervention {
