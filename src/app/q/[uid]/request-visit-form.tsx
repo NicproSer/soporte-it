@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CheckCircle2, Loader2, Send } from "lucide-react";
+import { CalendarClock, CheckCircle2, Loader2, Send, X } from "lucide-react";
 
 type Props = {
   uid: string;
@@ -93,7 +93,13 @@ export default function RequestVisitForm({ uid, equipmentId, labelCode, equipmen
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ marginTop: 4 }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(10,25,45,.62)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} role="presentation" onMouseDown={e => { if (e.target === e.currentTarget && !saving) setOpen(false); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="visit-modal-title" style={{ width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 24px 70px rgba(0,0,0,.28)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div><h2 id="visit-modal-title" style={{ margin: 0, fontSize: 20, color: "#102a43" }}>Solicitar visita técnica</h2><p style={{ margin: "5px 0 0", fontSize: 13, color: "#64748b" }}>Completa los datos para coordinar la atención de este equipo.</p></div>
+          <button type="button" aria-label="Cerrar" onClick={() => setOpen(false)} disabled={saving} style={{ border: 0, background: "#eef2f7", color: "#334155", borderRadius: 9, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}><X size={18}/></button>
+        </div>
+        <form onSubmit={onSubmit} style={{ marginTop: 4 }}>
       {ownerName ? (
         <div style={{ background: "#eef4fb", border: "1px solid #cfe0f5", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#28456b" }}>
           Equipo registrado a nombre de <strong>{ownerName}</strong>. Solo necesitamos tus datos de contacto para coordinar la visita.
@@ -142,6 +148,8 @@ export default function RequestVisitForm({ uid, equipmentId, labelCode, equipmen
       <div className="generate-hint" style={{ marginTop: 10 }}>
         Tu solicitud quedará vinculada a la etiqueta <strong>{labelCode}</strong>. Un administrador revisará el caso y te propondrá un día por correo; podrás aceptarlo, rechazarlo o sugerir otra fecha.
       </div>
-    </form>
+        </form>
+      </section>
+    </div>
   );
 }
