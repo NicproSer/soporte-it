@@ -109,7 +109,7 @@ export default async function VisitsManagementPage({
     }),
     prisma.visitRequest.count({ where }),
     session.role === "ADMIN"
-      ? prisma.user.findMany({ where: { role: "TECHNICIAN" }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } })
+      ? prisma.user.findMany({ where: { role: { in: ["ADMIN", "TECHNICIAN"] } }, orderBy: [{ role: "asc" }, { name: "asc" }], select: { id: true, name: true, email: true } })
       : Promise.resolve([]),
     prisma.visitRequest.groupBy({ by: ["status"], where: session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}, _count: { _all: true } }),
   ]);
@@ -153,7 +153,7 @@ export default async function VisitsManagementPage({
           <label>Estado<select name="status" defaultValue={selectedStatus}><option value="">Todos los estados</option>{STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Desde<input type="date" name="from" defaultValue={from} /></label>
           <label>Hasta<input type="date" name="to" defaultValue={to} /></label>
-          {session.role === "ADMIN" ? <label>Técnico<select name="assigned" defaultValue={assigned}><option value="">Todos los técnicos</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label> : null}
+          {session.role === "ADMIN" ? <label>Responsable<select name="assigned" defaultValue={assigned}><option value="">Todos los responsables</option><option value="unassigned">Sin asignar</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name} · {technician.role === "ADMIN" ? "Administrador" : "Técnico"}</option>)}</select></label> : null}
           <div className="visit-filter-buttons"><button type="submit" className="generate-button"><Filter size={15} /> Aplicar</button><Link href="/dashboard/visitas" className="btn-ghost">Limpiar</Link></div>
         </form>
       </section>
@@ -191,7 +191,7 @@ export default async function VisitsManagementPage({
                       <span><MapPin size={14} />{visit.address}</span>
                       <span><CalendarClock size={14} />{formatDate(effectiveDate)}</span>
                       <span><Wrench size={14} />{visit.equipment?.name ?? "Sin equipo asociado"}{visit.equipment?.location ? ` · ${visit.equipment.location}` : ""}</span>
-                      <span><UserRound size={14} />{visit.assignedTo ? `Asignado a ${visit.assignedTo.name}` : "Sin técnico asignado"}</span>
+                      <span><UserRound size={14} />{visit.assignedTo ? `Responsable: ${visit.assignedTo.name}` : "Sin asignar"}</span>
                     </div>
                     {visit.customerSuggestedDate && visit.status === "RESCHEDULE_REQUESTED" ? <div className="visit-customer-note">Nueva fecha sugerida por el cliente: <strong>{formatDate(visit.customerSuggestedDate)}</strong>{visit.customerNote ? <span> · {visit.customerNote}</span> : null}</div> : null}
                     {visit.proposedMessage ? <div className="item-sub">Mensaje enviado al cliente: {visit.proposedMessage}</div> : null}
