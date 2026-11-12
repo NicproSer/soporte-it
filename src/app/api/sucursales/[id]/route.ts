@@ -30,11 +30,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!(await authorized())) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const { id } = await params;
   try {
-    const [equipmentCount, branch] = await Promise.all([
-      prisma.equipment.count({ where: { branchId: id } }),
-      prisma.branch.findUnique({ where: { id }, include: { sites: true } }),
-    ]);
+    const branch = await prisma.branch.findUnique({ where: { id }, include: { sites: true } });
     if (!branch) return NextResponse.json({ error: "La sucursal no existe." }, { status: 404 });
+    const siteIds = branch.sites.map((site) => site.id);
+    const equipmentCount = await prisma.equipment.count({ where: { OR: [{ branchId: id }, ...(siteIds.length ? [{ siteId: { in: siteIds } }] : [])] } });
     if (equipmentCount > 0) return NextResponse.json({ error: "No se puede eliminar esta sucursal porque tiene equipos asociados. Reasigna esos equipos primero." }, { status: 409 });
     await prisma.site.deleteMany({ where: { branchId: id } });
     await prisma.branch.delete({ where: { id } });
