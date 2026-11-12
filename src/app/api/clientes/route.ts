@@ -4,13 +4,17 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+async function canRead() {
+  const session = await getSession();
+  return session?.role === "ADMIN" || session?.role === "TECHNICIAN";
+}
 async function admin() {
   const session = await getSession();
   return session?.role === "ADMIN";
 }
 
 export async function GET() {
-  if (!(await admin())) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  if (!(await canRead())) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const clientes = await prisma.customer.findMany({
     orderBy: { name: "asc" },
     include: { branches: { orderBy: { name: "asc" }, include: { sites: { orderBy: { name: "asc" } } } }, equipment: { select: { id: true, name: true, location: true, branchId: true, siteId: true } } },
