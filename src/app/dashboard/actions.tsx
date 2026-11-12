@@ -171,7 +171,7 @@ export function SmtpAdminPanel({ compact = true }: { compact?: boolean }) {
 
   async function loadLogs() {
     try {
-      const response = await fetch("/api/admin/email/logs?limit=6", { cache: "no-store" });
+      const response = await fetch(`/api/admin/email/logs?limit=${compact ? 3 : 100}`, { cache: "no-store" });
       if (!response.ok) throw new Error("No se pudo consultar el historial de correos.");
       const data = await response.json();
       setLogs(data.logs ?? []);
