@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, UserRoundCog } from "lucide-react";
 
-type Technician = { id: string; name: string; email: string };
+type Technician = { id: string; name: string; email: string; role?: "ADMIN" | "TECHNICIAN" };
 type Props = { visitId: string; assignedToId: string | null; technicians: Technician[] };
 
 export default function VisitAssignmentSelect({ visitId, assignedToId, technicians }: Props) {
@@ -27,7 +27,7 @@ export default function VisitAssignmentSelect({ visitId, assignedToId, technicia
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(data.error ?? "No se pudo asignar el técnico.");
+        setError(data.error ?? "No se pudo asignar el responsable.");
         return;
       }
       setSaved(true);
@@ -42,7 +42,7 @@ export default function VisitAssignmentSelect({ visitId, assignedToId, technicia
   return (
     <div className="visit-assignment">
       <label className="visit-assignment-label" htmlFor={`assign-${visitId}`}>
-        <UserRoundCog size={14} /> Técnico responsable
+        <UserRoundCog size={14} /> Responsable de la visita
       </label>
       <div className="visit-assignment-controls">
         <select
@@ -53,7 +53,7 @@ export default function VisitAssignmentSelect({ visitId, assignedToId, technicia
         >
           <option value="">Sin asignar</option>
           {technicians.map((technician) => (
-            <option key={technician.id} value={technician.id}>{technician.name}</option>
+            <option key={technician.id} value={technician.id}>{technician.name} · {technician.role === "ADMIN" ? "Administrador" : "Técnico"}</option>
           ))}
         </select>
         <button type="button" onClick={save} disabled={busy || value === (assignedToId ?? "")} aria-label="Guardar asignación">
