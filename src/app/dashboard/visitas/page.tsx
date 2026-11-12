@@ -109,7 +109,7 @@ export default async function VisitsManagementPage({
     }),
     prisma.visitRequest.count({ where }),
     session.role === "ADMIN"
-      ? prisma.user.findMany({ where: { role: { in: ["ADMIN", "TECHNICIAN"] } }, orderBy: [{ role: "asc" }, { name: "asc" }], select: { id: true, name: true, email: true } })
+      ? prisma.user.findMany({ where: { role: { in: ["ADMIN", "TECHNICIAN"] } }, orderBy: [{ role: "asc" }, { name: "asc" }], select: { id: true, name: true, email: true, role: true } })
       : Promise.resolve([]),
     prisma.visitRequest.groupBy({ by: ["status"], where: session.role === "TECHNICIAN" ? { assignedToId: session.sub } : {}, _count: { _all: true } }),
   ]);
