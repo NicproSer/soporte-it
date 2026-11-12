@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Save, UserRound } from "lucide-react";
 
@@ -25,11 +25,18 @@ type Props = {
 
 const inputStyle = { width: "100%", marginTop: 6, padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: 10, fontSize: 14, background: "#fff", color: "#0f2a43" } as const;
 
+type CustomerOption = { id: string; name: string; email: string; phone?: string | null; branches: { id: string; name: string; sites: { id: string; name: string }[] }[] };
+
 export default function FichaForm({ uid, initial }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [customerId, setCustomerId] = useState("");
+  const [branchId, setBranchId] = useState("");
+  const [siteId, setSiteId] = useState("");
+  useEffect(() => { fetch("/api/clientes").then(r => r.ok ? r.json() : null).then(d => { if (d?.clientes) setCustomers(d.clientes); }).catch(() => undefined); }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,7 +44,7 @@ export default function FichaForm({ uid, initial }: Props) {
     setError(null);
     setDone(null);
     const fd = new FormData(e.currentTarget);
-    const payload: Record<string, unknown> = {};
+    const payload: Record<string, unknown> = { customerId, branchId, siteId };
     for (const [key, value] of fd.entries()) {
       if (typeof value === "string" && value.trim() !== "") payload[key] = value.trim();
     }
@@ -118,6 +125,27 @@ export default function FichaForm({ uid, initial }: Props) {
         Nombre y correo son obligatorios al registrar por primera vez. Al escanear el QR, la solicitud de visita técnica se prellena con estos datos.
       </div>
       <div className="field-grid">
+        <label style={{ gridColumn: "1 / -1" }}>
+          <span className="field-label">Vincular a un cliente registrado</span>
+          <select value={customerId} onChange={e => { setCustomerId(e.target.value); setBranchId(""); setSiteId(""); const c = customers.find(x => x.id === e.target.value); if (c) { const name = document.querySelector<HTMLInputElement>('input[name="ownerName"]'); const email = document.querySelector<HTMLInputElement>('input[name="ownerEmail"]'); const phone = document.querySelector<HTMLInputElement>('input[name="ownerPhone"]'); if (name) name.value = c.name; if (email) email.value = c.email; if (phone) phone.value = c.phone ?? ""; } }} style={inputStyle}>
+            <option value="">Seleccionar cliente existente (opcional)</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name} · {c.email}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Sucursal</span>
+          <select value={branchId} onChange={e => { setBranchId(e.target.value); setSiteId(""); }} style={inputStyle} disabled={!customerId}>
+            <option value="">Seleccionar sucursal</option>
+            {customers.find(c => c.id === customerId)?.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Sitio / ubicación GPS</span>
+          <select value={siteId} onChange={e => setSiteId(e.target.value)} style={inputStyle} disabled={!branchId}>
+            <option value="">Seleccionar sitio</option>
+            {customers.find(c => c.id === customerId)?.branches.find(b => b.id === branchId)?.sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+          </select>
+        </label>
         <label>
           <span className="field-label">Nombre del cliente *</span>
           <input name="ownerName" required defaultValue={initial?.ownerName ?? ""} placeholder="Persona o empresa propietaria" style={inputStyle} maxLength={160} />
