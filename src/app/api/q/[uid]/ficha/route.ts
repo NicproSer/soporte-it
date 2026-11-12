@@ -56,6 +56,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
   const rawStatus = cleanStr(body.status, 20)?.toUpperCase();
   const status: EquipmentStatus = (STATUSES as string[]).includes(rawStatus ?? "") ? (rawStatus as EquipmentStatus) : "ACTIVE";
 
+  const customerId = cleanStr(body.customerId, 24);
+  const branchId = cleanStr(body.branchId, 24);
+  const siteId = cleanStr(body.siteId, 24);
+  let selectedCustomer: { id: string; name: string; email: string; phone: string | null; branches: { id: string; sites: { id: string }[] }[] } | null = null;
+  if (customerId) {
+    selectedCustomer = await prisma.customer.findUnique({ where: { id: customerId }, include: { branches: { include: { sites: true } } } });
+    if (!selectedCustomer) return NextResponse.json({ error: "El cliente seleccionado no existe." }, { status: 400 });
+    if (branchId && !selectedCustomer.branches.some(b => b.id === branchId)) return NextResponse.json({ error: "La sucursal no pertenece al cliente seleccionado." }, { status: 400 });
+    if (siteId && !selectedCustomer.branches.some(b => b.id === branchId && b.sites.some(site => site.id === siteId))) return NextResponse.json({ error: "El sitio no pertenece a la sucursal seleccionada." }, { status: 400 });
+  } else if (branchId || siteId) {
+    return NextResponse.json({ error: "Selecciona un cliente antes de asignar sucursal o sitio." }, { status: 400 });
+  }
+
   const data = {
     name,
     category,
@@ -67,9 +80,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ uid
     warrantyUntil: toDate(body.warrantyUntil),
     status,
     notes: cleanStr(body.notes, 2000) ?? null,
-    ownerName: cleanStr(body.ownerName, 160) ?? null,
-    ownerEmail: cleanStr(body.ownerEmail, 160)?.toLowerCase() ?? null,
-    ownerPhone: cleanStr(body.ownerPhone, 40) ?? null,
+    ownerName: selectedCustomer?.name ?? cleanStr(body.ownerName, 160) ?? null,
+    ownerEmail: selectedCustomer?.email ?? cleanStr(body.ownerEmail, 160)?.toLowerCase() ?? null,
+    ownerPhone: selectedCustomer?.phone ?? cleanStr(body.ownerPhone, 40) ?? null,
+    customerId: selectedCustomer?.id ?? null,
+    branchId: branchId ?? null,
+    siteId: siteId ?? null,
   };
 
   // upsert sobre labelId (campo único en Equipment)
