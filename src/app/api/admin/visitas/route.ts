@@ -143,7 +143,7 @@ export async function PATCH(req: Request) {
       customerEmail: visit.customerEmail,
       confirmedDate: dateToConfirm,
     })
-      .then(() => console.log(`[admin/visitas] confirmación enviada a ${updated.customerEmail}`))
+      .then(() => console.log(`[admin/visitas] confirmación enviada a ${visit.customerEmail}`))
       .catch((e) => console.error("[admin/visitas] error enviando confirmación:", e)));
 
     return NextResponse.json({ ok: true });
