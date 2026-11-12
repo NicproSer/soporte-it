@@ -28,7 +28,7 @@ export async function PATCH(
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Selecciona un técnico válido o deja la visita sin asignar." }, { status: 400 });
+    return NextResponse.json({ error: "Selecciona un administrador o técnico válido, o deja la visita sin asignar." }, { status: 400 });
   }
 
   try {
@@ -38,16 +38,16 @@ export async function PATCH(
       return NextResponse.json({ error: "No se puede asignar una visita cerrada." }, { status: 409 });
     }
 
-    let assignedTechnician: { id: string; name: string; email: string } | null = null;
+    let assignedUser: { id: string; name: string; email: string; role: "ADMIN" | "TECHNICIAN" } | null = null;
     if (parsed.data.userId) {
-      const technician = await prisma.user.findUnique({
+      const selectedUser = await prisma.user.findUnique({
         where: { id: parsed.data.userId },
         select: { id: true, role: true, name: true, email: true },
       });
-      if (!technician || technician.role !== "TECHNICIAN") {
-        return NextResponse.json({ error: "La cuenta seleccionada no es un técnico activo." }, { status: 400 });
+      if (!selectedUser) {
+        return NextResponse.json({ error: "La cuenta seleccionada no existe." }, { status: 400 });
       }
-      assignedTechnician = technician;
+      assignedUser = selectedUser;
     }
 
     await prisma.visitRequest.update({
@@ -58,11 +58,11 @@ export async function PATCH(
       },
     });
 
-    if (assignedTechnician && assignedTechnician.id !== visit.assignedToId) {
+    if (assignedUser && assignedUser.id !== visit.assignedToId) {
       after(() => sendVisitAssignedEmail({
         id: visit.id,
-        technicianName: assignedTechnician!.name,
-        technicianEmail: assignedTechnician!.email,
+        technicianName: assignedUser!.name,
+        technicianEmail: assignedUser!.email,
         customerName: visit.customerName,
         customerEmail: visit.customerEmail,
         address: visit.address,
