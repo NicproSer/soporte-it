@@ -163,7 +163,7 @@ type EmailLog = {
   createdAt: string;
 };
 
-export function SmtpAdminPanel() {
+export function SmtpAdminPanel({ compact = true }: { compact?: boolean }) {
   const [checks, setChecks] = useState<SmtpCheck[] | null>(null);
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -199,6 +199,9 @@ export function SmtpAdminPanel() {
     void loadLogs();
   }, []);
 
+  const visibleChecks = compact && checks ? checks.slice(0, 3) : checks;
+  const visibleLogs = compact ? logs.slice(0, 3) : logs;
+
   return (
     <section className="card" id="correo" style={{ marginBottom: 18 }}>
       <div className="section-head">
@@ -218,9 +221,9 @@ export function SmtpAdminPanel() {
         </button>
       </div>
       {error ? <div className="generate-status error">{error}</div> : null}
-      {checks ? (
+      {visibleChecks ? (
         <div className="list" style={{ marginBottom: 16 }}>
-          {checks.map((check) => (
+          {visibleChecks.map((check) => (
             <div className="list-item" key={check.stage} style={{ alignItems: "flex-start", gap: 10 }}>
               {check.ok ? <CheckCircle2 size={17} color="#21834a" /> : <AlertTriangle size={17} color="#b3261e" />}
               <div style={{ minWidth: 0 }}>
@@ -232,9 +235,9 @@ export function SmtpAdminPanel() {
         </div>
       ) : null}
       <div className="item-title" style={{ marginBottom: 8 }}>Últimos correos registrados</div>
-      {logs.length ? (
+      {visibleLogs.length ? (
         <div className="list">
-          {logs.map((log) => (
+          {visibleLogs.map((log) => (
             <div className="list-item" key={log.id} style={{ alignItems: "flex-start", gap: 10 }}>
               {log.status === "SENT" ? <CheckCircle2 size={16} color="#21834a" /> : <AlertTriangle size={16} color="#b3261e" />}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -247,6 +250,8 @@ export function SmtpAdminPanel() {
           ))}
         </div>
       ) : <div className="empty">Todavía no hay envíos registrados.</div>}
+      {compact ? <div style={{ marginTop: 14 }}><a href="/dashboard/correo" className="btn-ghost">Ver diagnóstico e historial completos →</a></div> : null}
+      {!compact ? <div style={{ marginTop: 14 }}><a href="/dashboard" className="btn-ghost">Volver al panel</a></div> : null}
     </section>
   );
 }
