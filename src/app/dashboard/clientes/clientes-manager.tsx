@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { MapPin, Plus, Save, LocateFixed, ExternalLink, Building2, Mail, Pencil, Trash2, X, AlertTriangle } from "lucide-react";
 
-type Site = { id: string; name: string; address: string; latitude: number | null; longitude: number | null; directions?: string | null };
-type Branch = { id: string; name: string; contactName?: string | null; contactEmail?: string | null; contactPhone?: string | null; sites: Site[] };
+type Equipment = { id: string; name: string; category: string; brand?: string | null; model?: string | null; serialNumber?: string | null; status: string; location?: string | null; siteId?: string | null; label: { uid: string } };
+type Site = { id: string; name: string; address: string; latitude: number | null; longitude: number | null; directions?: string | null; equipment: Equipment[] };
+type Branch = { id: string; name: string; contactName?: string | null; contactEmail?: string | null; contactPhone?: string | null; equipment: Equipment[]; sites: Site[] };
 type Customer = { id: string; name: string; email: string; phone?: string | null; branches: Branch[]; equipment: { id: string; name: string; branchId?: string | null; siteId?: string | null }[] };
 type ConfirmAction = { kind: "customer-save" | "customer-delete" | "branch-save" | "branch-delete"; id?: string; title: string; description: string };
 const input: React.CSSProperties = { width: "100%", padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: 9, background: "#fff", color: "#102a43", fontSize: 14 };
@@ -25,6 +26,7 @@ export default function ClientesManager() {
   const [siteFor, setSiteFor] = useState<string | null>(null);
   const [siteForm, setSiteForm] = useState({ name: "", address: "", latitude: "", longitude: "", directions: "" });
   const [confirmation, setConfirmation] = useState<ConfirmAction | null>(null);
+  const [viewingBranchId, setViewingBranchId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -114,7 +116,22 @@ export default function ClientesManager() {
       <div className="section-head"><div><h2 className="section-title"><Building2 size={17} style={{display:"inline",verticalAlign:"-3px",marginRight:7,color:"#1456c0"}}/>{c.name}</h2><div className="muted"><Mail size={12} style={{display:"inline",verticalAlign:"-2px",marginRight:4}}/>{c.email}{c.phone ? " · "+c.phone : ""}</div></div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button onClick={() => startEdit(c)} style={{...button,background:"#eaf1fb",color:"#1456c0"}}><Pencil size={14}/>Editar</button><button onClick={() => setConfirmation({kind:"customer-delete",id:c.id,title:"¿Eliminar este cliente?",description:"Se eliminarán también sus sucursales y sitios. Esta acción no se puede deshacer. Si tiene equipos asociados, el sistema bloqueará la eliminación."})} style={{...button,background:"#fff1f2",color:"#be123c"}}><Trash2 size={14}/>Eliminar</button></div></div>
       <div className="muted" style={{fontSize:12,marginBottom:12}}>{c.branches.length} sucursales · {c.equipment.length} equipos</div>
       {c.branches.map(b => <div key={b.id} style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginTop:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><div><strong>{b.name}</strong><div className="muted" style={{fontSize:12,marginTop:4}}>Contacto: {b.contactName || "Sin asignar"} · {b.contactEmail || "Sin correo de contacto"}{b.contactPhone ? " · "+b.contactPhone : ""}</div></div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button onClick={() => editBranch(b)} style={{...button,background:"#eaf1fb",color:"#1456c0"}}><Pencil size={13}/>Editar</button><button onClick={() => setConfirmation({kind:"branch-delete",id:b.id,title:"¿Eliminar esta sucursal?",description:"Se eliminarán también sus sitios. Si la sucursal tiene equipos asociados, el sistema bloqueará la eliminación."})} style={{...button,background:"#fff1f2",color:"#be123c"}}><Trash2 size={13}/>Eliminar</button><button onClick={() => {setSiteFor(b.id);setSiteForm({name:"",address:"",latitude:"",longitude:"",directions:""});}} style={{...button,background:"#eef5ff",color:"#1456c0"}}><Plus size={14}/>Agregar sitio</button></div></div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><div><strong>{b.name}</strong><div className="muted" style={{fontSize:12,marginTop:4}}>Contacto: {b.contactName || "Sin asignar"} · {b.contactEmail || "Sin correo de contacto"}{b.contactPhone ? " · "+b.contactPhone : ""}</div></div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button onClick={() => setViewingBranchId(viewingBranchId === b.id ? null : b.id)} style={{...button,background:"#eef5ff",color:"#1456c0"}}><Building2 size={13}/>{viewingBranchId === b.id ? "Ocultar equipos" : `Ver equipos (${new Map([...b.equipment, ...b.sites.flatMap(s => s.equipment)].map(eq => [eq.id, eq])).size})`}</button><button onClick={() => editBranch(b)} style={{...button,background:"#eaf1fb",color:"#1456c0"}}><Pencil size={13}/>Editar</button><button onClick={() => setConfirmation({kind:"branch-delete",id:b.id,title:"¿Eliminar esta sucursal?",description:"Se eliminarán también sus sitios. Si la sucursal tiene equipos asociados, el sistema bloqueará la eliminación."})} style={{...button,background:"#fff1f2",color:"#be123c"}}><Trash2 size={13}/>Eliminar</button><button onClick={() => {setSiteFor(b.id);setSiteForm({name:"",address:"",latitude:"",longitude:"",directions:""});}} style={{...button,background:"#eef5ff",color:"#1456c0"}}><Plus size={14}/>Agregar sitio</button></div></div>
+        {viewingBranchId === b.id && (() => {
+          const linkedEquipment = Array.from(new Map([...b.equipment, ...b.sites.flatMap(s => s.equipment)].map(eq => [eq.id, eq])).values());
+          return <div style={{marginTop:12,padding:13,background:"#f8fafc",border:"1px solid #dbe5f0",borderRadius:11}}>
+            <div style={{fontWeight:800,color:"#102a43",marginBottom:9}}>Dispositivos enlazados ({linkedEquipment.length})</div>
+            {linkedEquipment.length === 0 ? <div className="muted" style={{fontSize:13}}>Esta sucursal todavía no tiene dispositivos enlazados.</div> : <div style={{display:"grid",gap:8}}>
+              {linkedEquipment.map(eq => {
+                const site = b.sites.find(s => s.id === eq.siteId);
+                return <div key={eq.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",padding:10,background:"#fff",border:"1px solid #e2e8f0",borderRadius:9}}>
+                  <div><strong style={{fontSize:13,color:"#102a43"}}>{eq.name}</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{[eq.category, eq.brand, eq.model, eq.serialNumber ? "S/N: "+eq.serialNumber : null].filter(Boolean).join(" · ")}</div><div className="muted" style={{fontSize:12,marginTop:2}}>Sitio: {site?.name || eq.location || "Sin sitio asignado"} · Estado: {eq.status}</div></div>
+                  <a href={`/q/${eq.label.uid}`} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:5,color:"#1456c0",fontSize:12,fontWeight:700,textDecoration:"none"}}>Ver ficha <ExternalLink size={12}/></a>
+                </div>;
+              })}
+            </div>}
+          </div>;
+        })()}
         {b.sites.map(s => <div key={s.id} style={{background:"#f8fafc",borderRadius:10,padding:12,marginTop:9}}><strong>{s.name}</strong><div className="muted" style={{fontSize:12,marginTop:3}}>{s.address}</div>{s.directions && <div className="muted" style={{fontSize:12,marginTop:3}}>Referencia: {s.directions}</div>}{s.latitude != null && s.longitude != null ? <a href={`https://www.google.com/maps?q=${s.latitude},${s.longitude}`} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:7,color:"#1456c0",fontSize:12,fontWeight:700}}><MapPin size={13}/>Ver GPS en Maps <ExternalLink size={12}/></a> : <span className="muted" style={{fontSize:12}}>GPS pendiente</span>}</div>)}
         {siteFor === b.id && <form onSubmit={saveSite} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:9,marginTop:12,padding:12,background:"#f1f5f9",borderRadius:10}}>
           <label><span className="field-label">Nombre del sitio *</span><input required style={input} value={siteForm.name} onChange={e=>setSiteForm(v=>({...v,name:e.target.value}))} placeholder="Casa matriz, bodega…"/></label>
