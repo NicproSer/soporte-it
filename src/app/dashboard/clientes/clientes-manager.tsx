@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, Plus, Save, LocateFixed, ExternalLink, Building2, Mail, Pencil, Trash2, X, AlertTriangle } from "lucide-react";
+import { MapPin, Plus, Save, LocateFixed, ExternalLink, Building2, Mail, Pencil, Trash2, X, AlertTriangle, Search } from "lucide-react";
 
 type Equipment = { id: string; name: string; category: string; brand?: string | null; model?: string | null; serialNumber?: string | null; status: string; location?: string | null; siteId?: string | null; label: { uid: string } };
 type Site = { id: string; name: string; address: string; latitude: number | null; longitude: number | null; directions?: string | null; equipment: Equipment[] };
@@ -27,6 +27,7 @@ export default function ClientesManager() {
   const [siteForm, setSiteForm] = useState({ name: "", address: "", latitude: "", longitude: "", directions: "" });
   const [confirmation, setConfirmation] = useState<ConfirmAction | null>(null);
   const [viewingBranchId, setViewingBranchId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   async function load() {
     setLoading(true);
@@ -100,6 +101,13 @@ export default function ClientesManager() {
     setBranchForm({ name: b.name, contactName: b.contactName ?? "", contactEmail: b.contactEmail ?? "", contactPhone: b.contactPhone ?? "" });
   }
 
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase("es");
+  const filteredCustomers = customers.filter(c => {
+    const searchable = [c.name, c.email, c.phone, ...c.branches.flatMap(b => [b.name, b.contactName, b.contactEmail, b.contactPhone, ...b.sites.map(s => s.name)])]
+      .filter(Boolean).join(" ").toLocaleLowerCase("es");
+    return searchable.includes(normalizedSearch);
+  });
+
   return <div style={{ display: "grid", gap: 18 }}>
     <section className="card">
       <h2 className="section-title">{editing ? "Editar cliente" : "Registrar cliente"}</h2>
@@ -112,7 +120,15 @@ export default function ClientesManager() {
       </form>
     </section>
     {error && <div className="generate-status" role="alert">{error}</div>}
-    {loading ? <div className="empty">Cargando clientes…</div> : customers.length === 0 ? <div className="card empty">Todavía no hay clientes registrados. Crea el primero arriba.</div> : customers.map(c => <section className="card" key={c.id}>
+    {!loading && customers.length > 0 && <section className="card" style={{padding:14}}>
+      <label style={{display:"flex",alignItems:"center",gap:10,border:"1px solid #cbd5e1",borderRadius:10,padding:"0 12px",background:"#fff"}}>
+        <Search size={18} color="#64748b" />
+        <input aria-label="Buscar clientes" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Buscar por cliente, correo, teléfono, sucursal o sitio…" style={{...input,border:0,outline:"none",padding:"12px 0",background:"transparent"}} />
+        {searchTerm && <button type="button" onClick={()=>setSearchTerm("")} aria-label="Limpiar búsqueda" style={{...button,background:"#e8edf3",color:"#334155",padding:"6px 9px"}}><X size={14}/>Limpiar</button>}
+      </label>
+      <div className="muted" style={{fontSize:12,marginTop:8}}>{normalizedSearch ? `${filteredCustomers.length} de ${customers.length} clientes encontrados` : `${customers.length} clientes registrados`}</div>
+    </section>}
+    {loading ? <div className="empty">Cargando clientes…</div> : customers.length === 0 ? <div className="card empty">Todavía no hay clientes registrados. Crea el primero arriba.</div> : filteredCustomers.length === 0 ? <div className="card empty">No se encontraron clientes que coincidan con “{searchTerm}”. Prueba con otro nombre o correo.</div> : filteredCustomers.map(c => <section className="card" key={c.id}>
       <div className="section-head"><div><h2 className="section-title"><Building2 size={17} style={{display:"inline",verticalAlign:"-3px",marginRight:7,color:"#1456c0"}}/>{c.name}</h2><div className="muted"><Mail size={12} style={{display:"inline",verticalAlign:"-2px",marginRight:4}}/>{c.email}{c.phone ? " · "+c.phone : ""}</div></div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button onClick={() => startEdit(c)} style={{...button,background:"#eaf1fb",color:"#1456c0"}}><Pencil size={14}/>Editar</button><button onClick={() => setConfirmation({kind:"customer-delete",id:c.id,title:"¿Eliminar este cliente?",description:"Se eliminarán también sus sucursales y sitios. Esta acción no se puede deshacer. Si tiene equipos asociados, el sistema bloqueará la eliminación."})} style={{...button,background:"#fff1f2",color:"#be123c"}}><Trash2 size={14}/>Eliminar</button></div></div>
       <div className="muted" style={{fontSize:12,marginBottom:12}}>{c.branches.length} sucursales · {c.equipment.length} equipos</div>
       {c.branches.map(b => <div key={b.id} style={{borderTop:"1px solid #e2e8f0",paddingTop:14,marginTop:12}}>
