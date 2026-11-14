@@ -17,7 +17,7 @@ export async function GET() {
   if (!(await canRead())) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const clientes = await prisma.customer.findMany({
     orderBy: { name: "asc" },
-    include: { branches: { orderBy: { name: "asc" }, include: { sites: { orderBy: { name: "asc" } } } }, equipment: { select: { id: true, name: true, location: true, branchId: true, siteId: true } } },
+    include: { branches: { orderBy: { name: "asc" }, include: { equipment: { select: { id: true, name: true, category: true, brand: true, model: true, serialNumber: true, status: true, location: true, siteId: true, label: { select: { uid: true } } } }, sites: { orderBy: { name: "asc" }, include: { equipment: { select: { id: true, name: true, category: true, brand: true, model: true, serialNumber: true, status: true, location: true, siteId: true, label: { select: { uid: true } } } } } } }, equipment: { select: { id: true, name: true, location: true, branchId: true, siteId: true } } },
   });
   return NextResponse.json({ clientes });
 }
